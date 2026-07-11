@@ -1,0 +1,37 @@
+# ── Secrets — never commit ───────────────────────────────
+**/key.properties
+**/*.jks
+**/*.keystore
+
+# ── Local / IP-laden data — kept out of the public repo ──
+apk/
+decompiled/
+staging/
+tools/jadx/
+tools/*.zip
+tools/rel.json
+tools/gameset_database.json
+tools/deck_*.json
+app/assets/deck_*.json
+app/store/
+
+# ── Flutter / Dart ───────────────────────────────────────
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/android/.gradle/
+app/android/local.properties
+**/*.g.dart
+
+# ── Node / Vite (card-maker) ─────────────────────────────
+card-maker/node_modules/
+card-maker/dist/
+card-maker/test-*.pdf
+card-maker/test-*.png
+
+# ── Misc ─────────────────────────────────────────────────
+.DS_Store
+*.log
+.idea/
+.vscode/

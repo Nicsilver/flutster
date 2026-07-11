@@ -1,0 +1,17 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Android signing — NEVER commit these
+android/key.properties
+android/upload-keystore.jks
+**/*.jks
+**/*.keystore
+
+# IDE
+.idea/
+*.iml
+.vscode/

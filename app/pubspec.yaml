@@ -1,0 +1,37 @@
+name: hitster_poc
+description: "PoC: scan a Hitster card QR and play the song on Spotify, with fast-forward and start-at-30s controls."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Spotify App Remote + auth (needs the Spotify app installed + Premium for playback control)
+  spotify_sdk: ^3.0.2
+  # QR / barcode scanning
+  mobile_scanner: ^5.2.3
+  # tiny helpers
+  cupertino_icons: ^1.0.6
+  # persist settings
+  shared_preferences: ^2.3.2
+  # deck sources: pick a local JSON file and store it
+  file_picker: ^8.1.2
+  path_provider: ^2.1.4
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 23
+  adaptive_icon_background: "#1DB954"
+  adaptive_icon_foreground: "assets/icon/foreground.png"
+
+flutter:
+  uses-material-design: true
