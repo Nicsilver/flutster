@@ -574,6 +574,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Text('Save & continue'),
             ),
           ),
+          const SizedBox(height: 28),
+          const Divider(),
+          const SizedBox(height: 14),
+          Text('Got physical music cards?',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(
+            "If you own printed music cards (like a music-timeline card game), Flutster "
+            "can play them too — it just needs a deck database that maps each card to a "
+            "track. Search the web for your game's card / gameset database (a public JSON "
+            "file), then add its URL under Deck sources. Optional — without one you can "
+            "still scan cards you make in the card maker.",
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DeckSourcesScreen())),
+            icon: const Icon(Icons.playlist_add),
+            label: const Text('Deck sources (optional)'),
+          ),
         ],
       ),
     );
@@ -732,9 +753,10 @@ class _DeckSourcesScreenState extends State<DeckSourcesScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Add a deck-database URL to resolve physical cards to songs. Flutster '
-              'ships no deck data; with none added you can still scan your own QR cards '
-              'from the card maker.',
+              "Add a deck-database URL to resolve physical cards to songs. Flutster "
+              "ships no deck data — search the web for your card game's card / gameset "
+              "database (a public JSON file) and paste its URL. With none added, you can "
+              "still scan cards you make in the card maker.",
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
