@@ -36,7 +36,7 @@ create, so you're never sharing credentials or hitting someone else's limits.
 1. Go to **[developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)** → **Create app**.
 2. **Redirect URIs** — add both:
    - `flutster://auth` (for the Android app)
-   - the card-maker URL you use (`https://nicsilver.github.io/Flutster/` for the hosted site, or `http://127.0.0.1:5173/` if you run it locally)
+   - the card-maker URL you use (`https://nicsilver.github.io/flutster/` for the hosted site, or `http://127.0.0.1:5173/` if you run it locally)
 3. **APIs** — tick **Web API** and **Android**.
 4. **Android** — add package `com.nicsilver.flutster` and the release SHA-1:
    `C4:9E:41:2D:B4:7E:C7:0A:53:B8:0A:67:97:42:FB:B6:80:28:F1:F6`
@@ -47,7 +47,7 @@ Requirements: the **Spotify app** installed and a **Spotify Premium** account.
 
 ## Card Maker
 
-- **Hosted (free):** https://nicsilver.github.io/Flutster/
+- **Hosted (free):** https://nicsilver.github.io/flutster/
 - **Local:**
   ```bash
   cd card-maker
