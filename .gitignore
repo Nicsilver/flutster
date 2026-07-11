@@ -30,6 +30,9 @@ card-maker/dist/
 card-maker/test-*.pdf
 card-maker/test-*.png
 
+# ── Local AI context (handoff notes; not for the public repo) ─
+CLAUDE.md
+
 # ── Misc ─────────────────────────────────────────────────
 .DS_Store
 *.log
