@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:spotify_sdk/models/player_state.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'card_resolver.dart';
 import 'settings.dart';
@@ -69,11 +70,18 @@ class _ScanHomeState extends State<ScanHome> {
         _spotifyOk = ok;
         _spotifyStatus = ok ? 'Spotify' : 'Tap to connect';
       });
-    } catch (_) {
+      if (!ok && mounted) {
+        _snack('Couldn\'t connect. Is Spotify installed and logged in?');
+      }
+    } catch (e) {
       setState(() {
         _spotifyOk = false;
         _spotifyStatus = 'Tap to connect';
       });
+      if (mounted) {
+        final msg = e is PlatformException ? (e.message ?? e.code) : e.toString();
+        _snack('Spotify: $msg');
+      }
     }
   }
 
@@ -540,7 +548,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 20),
-          _step(1, 'Open developer.spotify.com/dashboard, log in, and press Create app.'),
+          _step(1, 'Log in and press Create app in the Spotify dashboard.',
+              link: 'https://developer.spotify.com/dashboard',
+              linkLabel: 'Open dashboard'),
           _step(2, 'Redirect URI — add exactly:', copy: _redirect),
           _step(3, 'Which API/SDKs — tick Web API and Android.'),
           _step(4, 'Android package name:', copy: _pkg),
@@ -569,7 +579,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _step(int n, String text, {String? copy}) {
+  void _copy(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Copied'), duration: Duration(seconds: 1)));
+  }
+
+  Future<void> _open(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Widget _step(int n, String text, {String? copy, String? link, String? linkLabel}) {
+    const green = Color(0xFF1DB954);
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
@@ -577,7 +598,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           CircleAvatar(
             radius: 13,
-            backgroundColor: const Color(0xFF1DB954),
+            backgroundColor: green,
             child: Text('$n',
                 style: const TextStyle(
                     color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -588,15 +609,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(text),
+                if (link != null)
+                  TextButton.icon(
+                    onPressed: () => _open(link),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: Text(linkLabel ?? 'Open'),
+                  ),
                 if (copy != null)
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(top: 5),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4, right: 4),
                     decoration: BoxDecoration(
                         color: Colors.white10, borderRadius: BorderRadius.circular(8)),
-                    child: SelectableText(copy,
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: SelectableText(copy,
+                              style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.copy, size: 18, color: green),
+                          onPressed: () => _copy(copy),
+                        ),
+                      ],
+                    ),
                   ),
               ],
             ),

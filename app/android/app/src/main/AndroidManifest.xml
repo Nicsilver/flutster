@@ -45,5 +45,10 @@
         </intent>
         <!-- Needed on Android 11+ so the Spotify App Remote can see/launch Spotify. -->
         <package android:name="com.spotify.music"/>
+        <!-- Lets url_launcher open the dashboard link in a browser. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
     </queries>
 </manifest>
