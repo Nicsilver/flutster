@@ -137,8 +137,9 @@ export default function App() {
             <span className="sp-dot" /> Log in with Spotify
           </button>
           <p className="hint">
-            First time? Add this redirect URI to your Spotify dashboard:{' '}
-            <code>{redirectUri()}</code>
+            First time? Add this redirect URI in your{' '}
+            <a className="link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">Spotify dashboard</a>:{' '}
+            <CopyCode text={redirectUri()} />
           </p>
         </section>
       </Shell>
@@ -329,6 +330,21 @@ function Field({ label, children }) {
   );
 }
 
+function CopyCode({ text }) {
+  const [ok, setOk] = useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(text);
+    setOk(true);
+    setTimeout(() => setOk(false), 1200);
+  };
+  return (
+    <span className="copycode">
+      <code>{text}</code>
+      <button type="button" className="copybtn" onClick={copy}>{ok ? '✓ Copied' : 'Copy'}</button>
+    </span>
+  );
+}
+
 function Num({ value, set, min, max, unit }) {
   return (
     <div className="num">
@@ -350,13 +366,13 @@ function SetupClientId({ onSaved }) {
         for you — nothing shared, no accounts to trust.
       </p>
       <ol className="setup-steps">
-        <li>Open <code>developer.spotify.com/dashboard</code> and press <b>Create app</b>.</li>
-        <li>Add this <b>Redirect URI</b> exactly: <code>{redirectUri()}</code></li>
+        <li>Open <a className="link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com/dashboard</a> and press <b>Create app</b>.</li>
+        <li>Add this <b>Redirect URI</b> exactly: <CopyCode text={redirectUri()} /></li>
         <li>Under APIs, tick <b>Web API</b>.</li>
         <li>In <b>Users and Access</b>, add your own Spotify account.</li>
         <li>Copy the app's <b>Client ID</b> and paste it below.</li>
       </ol>
-      <div className="row">
+      <div className="row setup-save">
         <input className="grow" placeholder="Spotify Client ID" value={v}
           onChange={(e) => setV(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && save()} />

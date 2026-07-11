@@ -1,11 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:spotify_sdk/models/player_state.dart';
 
 import 'card_resolver.dart';
@@ -610,8 +607,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-// Manage deck-database sources (URLs and local files). Flutster ships no deck
-// data itself — these are how physical cards get resolved to tracks.
+// Manage deck-database source URLs. Flutster ships no deck data itself — these
+// are how physical cards get resolved to tracks.
 class DeckSourcesScreen extends StatefulWidget {
   const DeckSourcesScreen({super.key});
   @override
@@ -657,11 +654,6 @@ class _DeckSourcesScreenState extends State<DeckSourcesScreen> {
   Future<void> _remove(String src) async {
     final list = [...AppSettings.instance.deckSources.value]..remove(src);
     await AppSettings.instance.setDeckSources(list);
-    if (!src.startsWith('http')) {
-      try {
-        await File(src).delete();
-      } catch (_) {}
-    }
     await _reload();
   }
 
@@ -688,17 +680,6 @@ class _DeckSourcesScreenState extends State<DeckSourcesScreen> {
     if (url != null && url.isNotEmpty) await _add(url);
   }
 
-  Future<void> _addFile() async {
-    final res = await FilePicker.platform.pickFiles(
-        type: FileType.custom, allowedExtensions: ['json'], withData: true);
-    final picked = (res != null && res.files.isNotEmpty) ? res.files.first : null;
-    if (picked?.bytes == null) return;
-    final dir = await getApplicationDocumentsDirectory();
-    final f = File('${dir.path}/deck_${DateTime.now().millisecondsSinceEpoch}.json');
-    await f.writeAsBytes(picked!.bytes!);
-    await _add(f.path);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -708,9 +689,9 @@ class _DeckSourcesScreenState extends State<DeckSourcesScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Add deck databases to resolve physical cards to songs — a public URL or a '
-              'local JSON file. Flutster ships no deck data; with none added you can still '
-              'scan your own QR cards from the card maker.',
+              'Add a deck-database URL to resolve physical cards to songs. Flutster '
+              'ships no deck data; with none added you can still scan your own QR cards '
+              'from the card maker.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -723,16 +704,8 @@ class _DeckSourcesScreenState extends State<DeckSourcesScreen> {
                       children: [
                         for (final src in sources)
                           ListTile(
-                            leading: Icon(src.startsWith('http')
-                                ? Icons.link
-                                : Icons.insert_drive_file),
-                            title: Text(
-                                src.startsWith('http')
-                                    ? src
-                                    : src.split(Platform.pathSeparator).last,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
-                            subtitle: Text(src.startsWith('http') ? 'URL' : 'Local file'),
+                            leading: const Icon(Icons.link),
+                            title: Text(src, maxLines: 1, overflow: TextOverflow.ellipsis),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline),
                               onPressed: _busy ? null : () => _remove(src),
@@ -750,23 +723,14 @@ class _DeckSourcesScreenState extends State<DeckSourcesScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _busy ? null : _addUrl,
-                    icon: const Icon(Icons.add_link),
-                    label: const Text('Add URL'),
-                  ),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _addUrl,
+                  icon: const Icon(Icons.add_link),
+                  label: const Text('Add deck URL'),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _busy ? null : _addFile,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Add file'),
-                  ),
-                ),
-              ]),
+              ),
             ),
           ),
         ],

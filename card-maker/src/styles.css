@@ -72,6 +72,13 @@ body {
 .setup-steps li { margin-bottom: 6px; }
 .setup-steps b { color: var(--ink); }
 .setup-steps code { font-size: 12.5px; word-break: break-all; }
+.link { color: var(--accent-soft); text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
+.link:hover { color: var(--g1); }
+.setup-save { gap: 14px; margin-top: 10px; }
+.setup-save .primary { padding-left: 24px; padding-right: 24px; }
+.copycode { display: inline-flex; align-items: center; gap: 6px; }
+.copybtn { background: rgba(255, 255, 255, 0.08); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 2px 9px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.copybtn:hover { color: var(--ink); border-color: var(--line-strong); }
 
 /* buttons */
 button { font-family: inherit; border: 0; cursor: pointer; font-weight: 700; transition: all 0.15s ease; }

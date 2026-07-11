@@ -17,9 +17,6 @@ dependencies:
   cupertino_icons: ^1.0.6
   # persist settings
   shared_preferences: ^2.3.2
-  # deck sources: pick a local JSON file and store it
-  file_picker: ^8.1.2
-  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_lints: ^4.0.0
