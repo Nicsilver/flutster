@@ -1,7 +1,7 @@
 name: hitster_poc
 description: "PoC: scan a Hitster card QR and play the song on Spotify, with fast-forward and start-at-30s controls."
 publish_to: 'none'
-version: 1.1.0+2
+version: 1.1.1+3
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

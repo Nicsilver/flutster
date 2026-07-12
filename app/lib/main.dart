@@ -55,6 +55,104 @@ class FlutsterApp extends StatelessWidget {
   }
 }
 
+// ── Berry Punch gradient helpers (mirror the card-maker web theme) ──
+const _berryGradient = LinearGradient(
+  colors: [Color(0xFFFF3D81), Color(0xFFB026FF), Color(0xFF5B2BFF)],
+  stops: [0.0, 0.55, 1.0],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+/// Fills [text] with the Berry Punch gradient (like the web wordmark/headings).
+class GradientText extends StatelessWidget {
+  const GradientText(this.text, {super.key, this.style, this.gradient = _berryGradient});
+  final String text;
+  final TextStyle? style;
+  final Gradient gradient;
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (r) => gradient.createShader(Rect.fromLTWH(0, 0, r.width, r.height)),
+      child: Text(text, style: (style ?? const TextStyle()).copyWith(color: Colors.white)),
+    );
+  }
+}
+
+/// Gradient-filled primary button (mirrors the web `.primary`).
+class GradientButton extends StatelessWidget {
+  const GradientButton({
+    super.key,
+    required this.child,
+    required this.onPressed,
+    this.padding = const EdgeInsets.symmetric(vertical: 16, horizontal: 22),
+  });
+  final Widget child;
+  final VoidCallback? onPressed;
+  final EdgeInsetsGeometry padding;
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: enabled ? _berryGradient : null,
+        color: enabled ? null : Colors.white10,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: enabled
+            ? const [BoxShadow(color: Color(0x59B026FF), blurRadius: 22, offset: Offset(0, 8))]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onPressed,
+          child: Padding(
+            padding: padding,
+            child: Center(
+              child: DefaultTextStyle.merge(
+                style: TextStyle(
+                    color: enabled ? Colors.white : Colors.white38,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16),
+                child: child,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Soft corner glows over the plum background (mirrors the web radial glows).
+class BerryBackground extends StatelessWidget {
+  const BerryBackground({super.key, required this.child});
+  final Widget child;
+  static Widget _glow(Color c, [double size = 400]) => IgnorePointer(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(colors: [c.withValues(alpha: 0.22), c.withValues(alpha: 0.0)]),
+          ),
+        ),
+      );
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        const Positioned.fill(child: ColoredBox(color: Color(0xFF0E0A18))),
+        Positioned(left: -130, top: -150, child: _glow(const Color(0xFFFF3D81))),
+        Positioned(right: -150, top: -60, child: _glow(const Color(0xFF5B2BFF))),
+        Positioned(left: -80, bottom: -170, child: _glow(const Color(0xFFB026FF), 340)),
+        Positioned.fill(child: child),
+      ],
+    );
+  }
+}
+
 class ScanHome extends StatefulWidget {
   const ScanHome({super.key});
   @override
@@ -169,11 +267,9 @@ class _ScanHomeState extends State<ScanHome> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Flutster',
+                      const GradientText('Flutster',
                           style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white)),
+                              fontSize: 26, fontWeight: FontWeight.bold)),
                       Row(children: [
                         _StatusChip(
                           status: _spotifyStatus,
@@ -370,7 +466,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         if (didPop) _spotify.pause();
       },
       child: Scaffold(
-        body: SafeArea(
+        backgroundColor: Colors.transparent,
+        body: BerryBackground(
+          child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
@@ -404,9 +502,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 ],
               ),
               const Spacer(),
-              const Icon(Icons.music_note, size: 120),
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (r) =>
+                    _berryGradient.createShader(Rect.fromLTWH(0, 0, r.width, r.height)),
+                child: const Icon(Icons.music_note, size: 120, color: Colors.white),
+              ),
               const SizedBox(height: 28),
-              Text('Guess the year',
+              GradientText('Guess the year',
                   style: Theme.of(context)
                       .textTheme
                       .headlineLarge
@@ -451,20 +554,19 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 30),
-                    textStyle: const TextStyle(
-                        fontSize: 28, fontWeight: FontWeight.bold),
-                  ),
+                child: GradientButton(
                   onPressed: _guess,
-                  child: const Text('GUESS'),
+                  padding: const EdgeInsets.symmetric(vertical: 30),
+                  child: const Text('GUESS',
+                      style: TextStyle(
+                          fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
               ),
               const SizedBox(height: 40),
             ],
           ),
         ),
+      ),
       ),
       ),
     );
@@ -551,7 +653,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BerryBackground(
+      child: Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('Connect Spotify')),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -581,12 +685,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             onSubmitted: (_) => _save(),
           ),
           const SizedBox(height: 16),
-          FilledButton(
+          GradientButton(
             onPressed: _save,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('Save & continue'),
-            ),
+            child: const Text('Save & continue'),
           ),
           const SizedBox(height: 28),
           const Divider(),
@@ -611,7 +712,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   void _copy(String text) {
