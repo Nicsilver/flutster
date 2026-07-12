@@ -2,6 +2,30 @@ import { useEffect, useMemo, useState } from 'react';
 import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, redirectUri, getClientId, setClientId } from './spotify.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
 
+const A4_W = 210; // mm — page width drives the auto card size
+
+const pad2 = (y) => String(y % 100).padStart(2, '0');
+
+// Songs-per-year stats used by the summary card (histogram + stat footer).
+function yearStats(tracks) {
+  const years = tracks.map((t) => t.year).filter((y) => y > 0);
+  if (years.length < 2) return { dated: years.length };
+  const minY = Math.min(...years);
+  const maxY = Math.max(...years);
+  const span = Math.max(1, maxY - minY);
+  const counts = Array.from({ length: span + 1 }, (_, i) => ({ y: minY + i, c: 0 }));
+  for (const y of years) counts[y - minY].c++;
+  const maxC = Math.max(...counts.map((d) => d.c));
+  const peak = counts.find((d) => d.c === maxC);
+  return { dated: years.length, minY, maxY, span, counts, maxC, peak };
+}
+
+const SHUFFLE_ICON = (
+  <svg className="st-ic" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 3h5v5" /><path d="M4 20 21 3" /><path d="M21 16v5h-5" /><path d="M15 15l6 6" /><path d="M4 4l5 5" />
+  </svg>
+);
+
 export default function App() {
   const [clientId, setCid] = useState(getClientId());
   const [token, setToken] = useState(null);
@@ -15,13 +39,12 @@ export default function App() {
   const [loadingLists, setLoadingLists] = useState(false);
   const [selectedId, setSelectedId] = useState('');
 
-  const [cardMm, setCardMm] = useState(60);
-  const [marginMm, setMarginMm] = useState(8);
-  const [gapMm, setGapMm] = useState(2);
+  const [perRow, setPerRow] = useState(3);
   const [cut, setCut] = useState(true);
   const [flip, setFlip] = useState('long');
   const [capOn, setCapOn] = useState(false);
-  const [capN, setCapN] = useState(10);
+  const [capN, setCapN] = useState(2);
+  const [railQuery, setRailQuery] = useState('');
   const [order, setOrder] = useState([]);
   const [excluded, setExcluded] = useState(new Set());
 
@@ -40,6 +63,10 @@ export default function App() {
       .finally(() => setLoadingLists(false));
   }, [token]);
 
+  const marginMm = 8; // auto — fixed page margin
+  const gapMm = 2; // auto — fixed gap between cards
+  // "Cards per row" is the only size control; the card size (square) is derived to fit A4.
+  const cardMm = Math.round(((A4_W - 2 * marginMm - (perRow - 1) * gapMm) / perRow) * 10) / 10;
   const opts = { cardMm, marginMm, gapMm, cut, flip };
   const grid = useMemo(() => estimatePerPage(opts), [cardMm, marginMm, gapMm]);
 
@@ -49,12 +76,26 @@ export default function App() {
       : playlist
       ? playlist.tracks.map((_, i) => i)
       : [];
-  const ordered = orderIdx.map((i) => ({ ...playlist.tracks[i], _idx: i }));
+  // Display sorted by year (undated last). Within a year, the current shuffle
+  // order decides sequence — so Shuffle only reshuffles cards inside their own
+  // year, which is also what the per-year cap uses to pick survivors.
+  const orderPos = new Map(orderIdx.map((idx, pos) => [idx, pos]));
+  const ordered = orderIdx
+    .map((i) => ({ ...playlist.tracks[i], _idx: i }))
+    .sort((a, b) => {
+      const ya = a.year || Infinity;
+      const yb = b.year || Infinity;
+      if (ya !== yb) return ya - yb;
+      return orderPos.get(a._idx) - orderPos.get(b._idx);
+    });
   const included = ordered.filter((t) => !excluded.has(t._idx));
   const tracks = capOn ? capPerYear(included, Math.max(1, capN || 1)) : included;
   const finalSet = new Set(tracks.map((t) => t._idx));
   const overCap = included.length - tracks.length;
   const pages = Math.ceil(tracks.length / grid.perPage);
+  const isLink = /^https?:\/\//i.test(railQuery.trim()) || /spotify:playlist/i.test(railQuery);
+  const q = railQuery.trim().toLowerCase();
+  const shownLists = !q || isLink ? myLists : myLists.filter((pl) => pl.name.toLowerCase().includes(q));
 
   async function onLoad(link = url) {
     setError('');
@@ -119,12 +160,12 @@ export default function App() {
   }
 
   if (!clientId) {
-    return <Shell><SetupClientId onSaved={(id) => { setClientId(id); setCid(id); }} /></Shell>;
+    return <Shell narrow><SetupClientId onSaved={(id) => { setClientId(id); setCid(id); }} /></Shell>;
   }
 
   if (!token) {
     return (
-      <Shell action={<button className="ghost sm" onClick={() => { setClientId(''); setCid(''); }}>Change ID</button>}>
+      <Shell narrow action={<button className="ghost sm" onClick={() => { setClientId(''); setCid(''); }}>Change ID</button>}>
         <section className="hero fade-in">
           <span className="pill">Spotify · QR · print at home</span>
           <h2 className="hero-title">Turn a playlist into a card game.</h2>
@@ -147,153 +188,161 @@ export default function App() {
   }
 
   return (
-    <Shell action={<button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button>}>
-      <div className="searchbar fade-in">
-        <svg className="search-ic" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"/></svg>
-        <input
-          className="grow"
-          placeholder="Paste a Spotify playlist link…"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && onLoad()}
-        />
-        <button className="primary" onClick={() => onLoad()} disabled={loading || !url}>
-          {loading ? 'Loading…' : 'Load'}
-        </button>
-      </div>
-      {error && <p className="error">{error}</p>}
-
-      {(loadingLists || myLists.length > 0) && (
-        <section className="panel fade-in">
-          <div className="panel-head">
-            <h3>Your playlists</h3>
-            <span className="badge">{loadingLists ? 'Loading…' : myLists.length}</span>
+    <Shell wide action={<button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button>}>
+      <div className="studio fade-in">
+        {/* LEFT — playlists */}
+        <aside className="st-rail">
+          <div className="st-rh">Playlists{myLists.length > 0 && <span className="badge">{myLists.length}</span>}</div>
+          <div className="st-search">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"/></svg>
+            <input
+              placeholder="Search or paste a link…"
+              value={railQuery}
+              onChange={(e) => setRailQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && isLink) onLoad(railQuery); }}
+            />
           </div>
-          {myLists.length === 0 ? (
-            <p className="hint">Fetching your playlists…</p>
+          {error && <p className="error">{error}</p>}
+          <div className="st-pllist">
+            {loadingLists && <p className="hint">Loading your playlists…</p>}
+            {!loadingLists && shownLists.length === 0 && (
+              <p className="hint">{isLink ? 'Press Enter to load this link.' : 'No playlists match.'}</p>
+            )}
+            {shownLists.map((pl) => (
+              <button
+                key={pl.id}
+                className={'st-plrow' + (selectedId === pl.id ? ' active' : '')}
+                onClick={() => choose(pl)}
+                title={pl.name}
+              >
+                <div className="st-plc">{pl.image ? <img src={pl.image} alt="" /> : <span>♪</span>}</div>
+                <div className="st-plmeta"><b>{pl.name}</b><span>{pl.count} tracks</span></div>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        {/* MIDDLE — the deck */}
+        <main className="st-mid">
+          {loading ? (
+            <div className="st-empty">Loading playlist…</div>
+          ) : !playlist ? (
+            <div className="st-empty">
+              <div className="st-empty-ic">🎴</div>
+              <p>Pick a playlist on the left — or paste a link — to start building cards.</p>
+            </div>
           ) : (
-            <div className="playlist-grid">
-              {myLists.map((pl) => (
-                <button
-                  key={pl.id}
-                  className={'pl-card' + (selectedId === pl.id ? ' active' : '')}
-                  onClick={() => choose(pl)}
-                  title={pl.name}
-                >
-                  <div className="pl-cover">
-                    {pl.image ? <img src={pl.image} alt="" /> : <span>♪</span>}
+            <>
+              <div className="st-midhead">
+                <h2 className="st-plname">{playlist.name}</h2>
+                <div className={'st-cap' + (capOn ? '' : ' off')}>
+                  <label className="toggle st-capsw">
+                    <input type="checkbox" checked={capOn} onChange={(e) => setCapOn(e.target.checked)} />
+                    <span className="track"><span className="thumb" /></span>
+                  </label>
+                  <span className="st-cap-l">Cap per year</span>
+                  <div className="st-stepper">
+                    <button type="button" onClick={() => setCapN((n) => Math.max(1, n - 1))} disabled={!capOn} aria-label="Fewer per year">−</button>
+                    <b>{capN}</b>
+                    <button type="button" onClick={() => setCapN((n) => Math.min(20, n + 1))} disabled={!capOn} aria-label="More per year">+</button>
                   </div>
-                  <div className="pl-meta">
-                    <b>{pl.name}</b>
-                    <span>{pl.count} tracks</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="panel fade-in">
-        <div className="panel-head">
-          <h3>Card layout</h3>
-          <span className="badge">{grid.cols}×{grid.rows} · {grid.perPage}/A4</span>
-        </div>
-        <div className="options">
-          <Field label="Card size"><Num value={cardMm} set={setCardMm} min={30} max={100} unit="mm" /></Field>
-          <Field label="Page margin"><Num value={marginMm} set={setMarginMm} min={0} max={30} unit="mm" /></Field>
-          <Field label="Gap"><Num value={gapMm} set={setGapMm} min={0} max={15} unit="mm" /></Field>
-          <Field label="Flip edge">
-            <select value={flip} onChange={(e) => setFlip(e.target.value)}>
-              <option value="long">Long edge (left↔right)</option>
-              <option value="short">Short edge (top↕bottom)</option>
-            </select>
-          </Field>
-          <label className="toggle">
-            <input type="checkbox" checked={cut} onChange={(e) => setCut(e.target.checked)} />
-            <span className="track"><span className="thumb" /></span>
-            <span>Cut guides</span>
-          </label>
-          <label className="toggle">
-            <input type="checkbox" checked={capOn} onChange={(e) => setCapOn(e.target.checked)} />
-            <span className="track"><span className="thumb" /></span>
-            <span>Cap per year</span>
-          </label>
-          {capOn && (
-            <Field label="Max / year"><Num value={capN} set={setCapN} min={1} max={50} unit="/yr" /></Field>
-          )}
-        </div>
-      </section>
-
-      {playlist && (
-        <section className="panel result fade-in">
-          <div className="panel-head">
-            <div>
-              <h3 className="playlist-name">{playlist.name}</h3>
-              <p className="sub">
-                {tracks.length} card{tracks.length !== 1 ? 's' : ''} · {pages} page{pages !== 1 ? 's' : ''} per side
-                {overCap > 0 && <span className="trim"> · {overCap} over cap</span>}
-                {excluded.size > 0 && <span className="trim"> · {excluded.size} excluded</span>}
-              </p>
-            </div>
-          </div>
-
-          <div className="downloads">
-            <button className="primary lg" onClick={() => download('fronts')} disabled={!!busy}>
-              {busy === 'fronts' ? 'Building…' : '⬇  Fronts · QR'}
-            </button>
-            <button className="primary lg alt" onClick={() => download('backs')} disabled={!!busy}>
-              {busy === 'backs' ? 'Building…' : '⬇  Backs · answers'}
-            </button>
-          </div>
-
-          <YearChart tracks={tracks} />
-
-          <div className="backs-head">
-            <h4 className="mini-cap">Card backs · {tracks.length} in deck</h4>
-            <div className="backs-actions">
-              {excluded.size > 0 && (
-                <button className="ghost sm" onClick={() => setExcluded(new Set())}>Reset picks</button>
-              )}
-              <button className="ghost sm" onClick={shuffle}>🔀 Shuffle</button>
-            </div>
-          </div>
-          <p className="hint pick-hint">Tap a card to include or exclude it. Shuffle re-rolls which songs survive the per-year cap.</p>
-          <div className="backs-preview">
-            {ordered.map((t) => {
-              const state = excluded.has(t._idx) ? 'excluded' : finalSet.has(t._idx) ? 'in' : 'over';
-              return (
-                <div className={`pcard ${state}`} key={t._idx} onClick={() => toggleCard(t._idx)} title="Include / exclude">
-                  <span className="yr">{t.year || '—'}</span>
-                  <b>{t.artist}</b>
-                  <i>{t.title}</i>
-                  {state !== 'in' && <span className="cap-tag">{state === 'over' ? 'over cap' : 'off'}</span>}
                 </div>
-              );
-            })}
-          </div>
+              </div>
 
-          <div className="printnote">
-            <span className="printnote-ic">🖨️</span>
-            <div>
-              Print the <b>Fronts</b> PDF, put the stack back in the tray, flip on the{' '}
-              <b>{flip === 'long' ? 'long edge (left↔right)' : 'short edge (top↕bottom)'}</b>,
-              then print the <b>Backs</b> PDF. Use <b>100% / actual size</b> (no “fit to page”)
-              and do one test sheet first.
+              <div className="st-dls">
+                <button className="primary lg" onClick={() => download('fronts')} disabled={!!busy}>
+                  {busy === 'fronts' ? 'Building…' : '⬇  Fronts · QR'}
+                </button>
+                <button className="primary lg alt" onClick={() => download('backs')} disabled={!!busy}>
+                  {busy === 'backs' ? 'Building…' : '⬇  Backs · answers'}
+                </button>
+              </div>
+
+              <SummaryCard tracks={tracks} pages={pages} />
+
+              <div className="st-sect">
+                <div className="st-backhead">
+                  <span className="st-caplabel">Card backs</span>
+                  <div className="st-actions">
+                    <button className="st-tbtn" onClick={shuffle}>{SHUFFLE_ICON} Shuffle</button>
+                    {excluded.size > 0 && (
+                      <button className="st-tbtn" onClick={() => setExcluded(new Set())}>Reset</button>
+                    )}
+                  </div>
+                </div>
+                <p className="st-pickhint">Tap a card to include or exclude it.</p>
+                <div className="backs-preview">
+                  {ordered.map((t) => {
+                    const state = excluded.has(t._idx) ? 'excluded' : finalSet.has(t._idx) ? 'in' : 'over';
+                    return (
+                      <div className={`pcard ${state}`} key={t._idx} onClick={() => toggleCard(t._idx)} title="Include / exclude">
+                        <span className="yr">{t.year || '—'}</span>
+                        <b>{t.artist}</b>
+                        <i>{t.title}</i>
+                        {state !== 'in' && <span className="cap-tag">{state === 'over' ? 'over cap' : 'off'}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="printnote">
+                  <span className="printnote-ic">🖨️</span>
+                  <div>
+                    Print the <b>Fronts</b> PDF, put the stack back in the tray, flip on the{' '}
+                    <b>{flip === 'long' ? 'long edge (left↔right)' : 'short edge (top↕bottom)'}</b>,
+                    then print the <b>Backs</b> PDF. Use <b>100% / actual size</b> (no “fit to page”) and do one test sheet first.
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </main>
+
+        {/* RIGHT — preview + layout */}
+        <aside className="st-rail st-right">
+          <div className="st-rh">Layout &amp; preview</div>
+          <div className="st-a4" style={{ gridTemplateColumns: `repeat(${grid.cols}, 1fr)` }}>
+            {Array.from({ length: grid.cols * grid.rows }).map((_, i) => (
+              <div key={i} className="st-cell" />
+            ))}
+          </div>
+          <div className="st-a4cap">A4 · {grid.cols}×{grid.rows} grid · {cardMm} mm cards</div>
+          <div className="st-setlist">
+            <div className="st-setrow">
+              <span>Cards per row</span>
+              <div className="st-stepper">
+                <button type="button" onClick={() => setPerRow((n) => Math.max(1, n - 1))} disabled={perRow <= 1} aria-label="Fewer per row">−</button>
+                <b>{perRow}</b>
+                <button type="button" onClick={() => setPerRow((n) => Math.min(6, n + 1))} disabled={perRow >= 6} aria-label="More per row">+</button>
+              </div>
+            </div>
+            <div className="st-setrow">
+              <span>Cut guides</span>
+              <label className="toggle">
+                <input type="checkbox" checked={cut} onChange={(e) => setCut(e.target.checked)} />
+                <span className="track"><span className="thumb" /></span>
+              </label>
+            </div>
+            <div className="st-setrow">
+              <span>Flip edge</span>
+              <select className="st-flip" value={flip} onChange={(e) => setFlip(e.target.value)}>
+                <option value="long">Long edge</option>
+                <option value="short">Short edge</option>
+              </select>
             </div>
           </div>
-        </section>
-      )}
+        </aside>
+      </div>
     </Shell>
   );
 }
 
-function Shell({ children, action }) {
+function Shell({ children, action, narrow, wide }) {
   return (
-    <div className="wrap">
+    <div className={'wrap' + (narrow ? ' wrap-narrow' : '') + (wide ? ' wrap-wide' : '')}>
       <header className="topbar">
         <div className="brand">
-          <div className="logo">♪</div>
+          <img className="logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Flutster" width="50" height="50" />
           <div className="brand-text">
             <h1>Flutster</h1>
             <span className="tag">Card Maker</span>
@@ -321,15 +370,6 @@ function capPerYear(tracks, n) {
   return out;
 }
 
-function Field({ label, children }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
-
 function CopyCode({ text }) {
   const [ok, setOk] = useState(false);
   const copy = () => {
@@ -345,11 +385,40 @@ function CopyCode({ text }) {
   );
 }
 
-function Num({ value, set, min, max, unit }) {
+function SummaryCard({ tracks, pages }) {
+  const [hover, setHover] = useState(null);
+  const ys = yearStats(tracks);
   return (
-    <div className="num">
-      <input type="number" min={min} max={max} value={value} onChange={(e) => set(+e.target.value)} />
-      <span className="unit">{unit}</span>
+    <div className="st-statcard">
+      <div className="st-sc-head">
+        <span className="st-caplabel">Songs per year</span>
+        {ys.dated > 1 && (
+          <span className={'st-scmeta' + (hover ? ' on' : '')}>
+            {hover ? `${hover.y} · ${hover.c} song${hover.c !== 1 ? 's' : ''}` : `${ys.dated} dated`}
+          </span>
+        )}
+      </div>
+      {ys.dated > 1 ? (
+        <div className="st-bars" onMouseLeave={() => setHover(null)}>
+          {ys.counts.map((d) => (
+            <div
+              key={d.y}
+              className={'bar' + (d.c === 0 ? ' zero' : '') + (d.c === ys.maxC ? ' peak' : '')}
+              style={{ height: d.c === 0 ? '3px' : `${Math.max(8, Math.round((d.c / ys.maxC) * 100))}%` }}
+              onMouseEnter={() => setHover(d)}
+              title={`${d.y} · ${d.c} song${d.c !== 1 ? 's' : ''}`}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="hint" style={{ margin: '6px 0 0' }}>Not enough dated tracks to chart.</p>
+      )}
+      <div className="st-scfoot">
+        <div className="st-fstat"><b>{tracks.length}</b><span>Cards</span></div>
+        <div className="st-fstat"><b>{pages}</b><span>Pages</span></div>
+        <div className="st-fstat"><b>{ys.peak ? `’${pad2(ys.minY)}–’${pad2(ys.maxY)}` : '—'}</b><span>Years</span></div>
+        <div className="st-fstat"><b>{ys.peak ? ys.peak.y : '—'}</b><span>Peak</span></div>
+      </div>
     </div>
   );
 }
@@ -372,61 +441,24 @@ function SetupClientId({ onSaved }) {
         <li>In <b>Users and Access</b>, add your own Spotify account.</li>
         <li>Copy the app's <b>Client ID</b> and paste it below.</li>
       </ol>
-      <div className="row setup-save">
-        <input className="grow" placeholder="Spotify Client ID" value={v}
-          onChange={(e) => setV(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && save()} />
-        <button className="primary" disabled={!v.trim()} onClick={save}>Save</button>
+      <div className="setup-save">
+        <label className="cid-field">
+          <span className="cid-label">Spotify Client ID</span>
+          <input
+            className="cid-input"
+            placeholder="Paste your 32-character Client ID"
+            value={v}
+            autoFocus
+            onChange={(e) => setV(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && save()}
+          />
+        </label>
+        <button className="primary lg cid-save" disabled={!v.trim()} onClick={save}>
+          Save &amp; continue
+        </button>
       </div>
+      <p className="hint cid-hint">Stored only in this browser — you can change it anytime from the top-right.</p>
     </section>
   );
 }
 
-function YearChart({ tracks }) {
-  const [hover, setHover] = useState(null);
-  const years = tracks.map((t) => t.year).filter((y) => y > 0);
-  if (years.length < 2) return null;
-
-  const minY = Math.min(...years);
-  const maxY = Math.max(...years);
-  const span = Math.max(1, maxY - minY);
-  const counts = Array.from({ length: span + 1 }, (_, i) => ({ y: minY + i, c: 0 }));
-  for (const y of years) counts[y - minY].c++;
-  const maxC = Math.max(...counts.map((d) => d.c));
-  const peak = counts.find((d) => d.c === maxC);
-  const undated = tracks.length - years.length;
-
-  const decades = [];
-  for (let d = Math.ceil(minY / 10) * 10; d <= maxY; d += 10) decades.push(d);
-
-  const defaultMeta =
-    `${years.length} dated · peak ${peak.y} (${maxC})` + (undated ? ` · ${undated} undated` : '');
-
-  return (
-    <div className="chart">
-      <div className="chart-top">
-        <span className="lede">Songs per year</span>
-        <span className="meta">
-          {hover ? `${hover.y} · ${hover.c} song${hover.c !== 1 ? 's' : ''}` : defaultMeta}
-        </span>
-      </div>
-      <div className="bars" onMouseLeave={() => setHover(null)}>
-        {counts.map((d) => (
-          <div
-            key={d.y}
-            className={'bar' + (d.c === maxC ? ' peak' : '')}
-            style={{ height: Math.max(3, Math.round((d.c / maxC) * 110)) }}
-            onMouseEnter={() => setHover(d)}
-          >
-            {d.c === maxC && <span className="peaklab">{d.c}</span>}
-          </div>
-        ))}
-      </div>
-      <div className="ticks">
-        {decades.map((d) => (
-          <span key={d} style={{ left: `${((d - minY) / span) * 100}%` }}>{d}</span>
-        ))}
-      </div>
-    </div>
-  );
-}
