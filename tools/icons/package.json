@@ -1,0 +1,12 @@
+{
+  "name": "flutster-icons",
+  "private": true,
+  "description": "Regenerates every Flutster icon/banner asset from one source-of-truth (the Original waveform).",
+  "scripts": {
+    "generate": "node generate.js"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "png-to-ico": "^2.1.8"
+  }
+}

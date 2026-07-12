@@ -28,9 +28,23 @@ class FlutsterApp extends StatelessWidget {
       title: 'Flutster',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF1DB954),
-        brightness: Brightness.dark,
         useMaterial3: true,
+        brightness: Brightness.dark,
+        // Berry Punch — mirrors the card-maker web theme.
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFB026FF), // violet
+          brightness: Brightness.dark,
+          secondary: const Color(0xFFFF3D81), // pink
+          tertiary: const Color(0xFF5B2BFF), // indigo
+          surface: const Color(0xFF17111F),
+          onSurface: const Color(0xFFFDEEE6),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF0E0A18),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0E0A18),
+          foregroundColor: Color(0xFFFDEEE6),
+          elevation: 0,
+        ),
       ),
       home: ValueListenableBuilder<String>(
         valueListenable: AppSettings.instance.clientId,
@@ -611,7 +625,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _step(int n, String text, {String? copy, String? link, String? linkLabel}) {
-    const green = Color(0xFF1DB954);
+    const berry = Color(0xFFB026FF);
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
@@ -619,10 +633,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           CircleAvatar(
             radius: 13,
-            backgroundColor: green,
+            backgroundColor: berry,
             child: Text('$n',
                 style: const TextStyle(
-                    color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
+                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -656,7 +670,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.copy, size: 18, color: green),
+                          icon: const Icon(Icons.copy, size: 18, color: berry),
                           onPressed: () => _copy(copy),
                         ),
                       ],
