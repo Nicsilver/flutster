@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flutster — Privacy Policy</title>
+<link rel="icon" href="favicon.svg" />
+<style>
+  :root {
+    --g1:#ff3d81; --g2:#b026ff; --g3:#5b2bff;
+    --bg:#0e0a18; --panel:#17111f; --ink:#fdeee6; --muted:#b8a9c9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    padding:0 20px;
+  }
+  main { max-width:760px; margin:0 auto; padding:56px 0 96px; }
+  h1 {
+    font-size:2.1rem; margin:0 0 4px;
+    background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .updated { color:var(--muted); font-size:.9rem; margin:0 0 32px; }
+  h2 { font-size:1.15rem; margin:34px 0 8px; }
+  p, li { color:#e8dcf2; }
+  a { color:var(--g1); }
+  strong { color:#fff; }
+  .card {
+    background:var(--panel); border:1px solid #2a2036; border-radius:14px;
+    padding:18px 22px; margin:22px 0;
+  }
+  footer { margin-top:48px; color:var(--muted); font-size:.85rem; }
+  code { background:#241a33; padding:2px 6px; border-radius:6px; font-size:.9em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Flutster — Privacy Policy</h1>
+  <p class="updated">Last updated: 13 July 2026</p>
+
+  <p>Flutster is a free, open-source music-timeline party-game companion. It scans a
+  card's QR code and plays the matching song on <strong>your own</strong> Spotify
+  account. This policy explains what data the app touches and what it does not.</p>
+
+  <div class="card">
+    <p style="margin:0"><strong>The short version:</strong> Flutster has no servers and
+    no accounts of its own. It collects no personal data, shows no ads, and contains no
+    analytics or tracking. Everything it stores stays on your device.</p>
+  </div>
+
+  <h2>Who runs Flutster</h2>
+  <p>Flutster is an independent, non-commercial project by an individual developer.
+  Contact: <a href="mailto:nic.silver@hotmail.dk">nic.silver@hotmail.dk</a>. Source code:
+  <a href="https://github.com/Nicsilver/flutster">github.com/Nicsilver/flutster</a> (AGPL-3.0 licensed).</p>
+
+  <h2>Data Flutster does <em>not</em> collect</h2>
+  <p>Flutster does not collect, transmit, sell, or share any personal information. There
+  is no Flutster account, no Flutster server, no advertising, and no analytics or crash
+  reporting. We never see your identity, your listening history, or your device data.</p>
+
+  <h2>What is stored on your device</h2>
+  <ul>
+    <li><strong>Your settings</strong> — such as your Spotify Client ID, deck-source URLs,
+      and playback preferences — are saved locally on your device only (Android shared
+      preferences). They are never sent to us. Uninstalling the app removes them.</li>
+    <li><strong>Camera</strong> — used solely to scan a card's QR code. Frames are
+      processed on-device in real time and are never stored, saved, or transmitted.
+      Flutster does not take or keep photos.</li>
+  </ul>
+
+  <h2>Your own Spotify account (bring-your-own credentials)</h2>
+  <p>Flutster plays music through Spotify using credentials <strong>you</strong> provide:
+  you create your own free Spotify developer application and enter its Client ID into the
+  app. Flutster then talks to Spotify directly from your device to control playback on
+  your account. Your Spotify login and playback are handled by Spotify's own app and
+  services — not by Flutster. Your use of Spotify is governed by
+  <a href="https://www.spotify.com/legal/privacy-policy/">Spotify's Privacy Policy</a>.
+  Flutster requests only the permissions needed to control playback and (optionally, at
+  your request) to save a song to a private playlist in your account.</p>
+
+  <h2>Deck sources you add</h2>
+  <p>Flutster can load card-to-song mappings from URLs that <strong>you</strong> add in
+  Settings. When you do, the app fetches that file directly from the URL you entered.
+  Flutster does not host, supply, or track any deck data.</p>
+
+  <h2>Children</h2>
+  <p>Flutster is not directed at children and collects no data from anyone. Spotify
+  requires its own users to meet its minimum age.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If this policy changes, the updated version will be posted at this URL with a new
+  date above.</p>
+
+  <h2>Contact</h2>
+  <p>Questions? Email <a href="mailto:nic.silver@hotmail.dk">nic.silver@hotmail.dk</a>.</p>
+
+  <footer>Flutster is not affiliated with, endorsed by, or connected to Spotify AB, or
+  with any physical card-game publisher. Spotify is a trademark of Spotify AB.</footer>
+</main>
+</body>
+</html>
