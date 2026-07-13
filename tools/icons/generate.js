@@ -136,6 +136,7 @@ const CM = (p) => path.join(REPO, 'card-maker', p);
 
   console.log('Play Store + repo banner:');
   write(A('store/play_store_512.png'), renderPng(fullIconSVG(), 512));
+  write(A('store/feature-graphic-1024x500.png'), renderPng(bannerSVG(1024, 500), 1024));
   write(path.join(REPO, 'screenshots/social-banner.png'), renderPng(bannerSVG(1280, 640), 1280));
 
   console.log('Card-maker web assets (public/):');

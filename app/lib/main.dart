@@ -46,10 +46,14 @@ class FlutsterApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: ValueListenableBuilder<String>(
-        valueListenable: AppSettings.instance.clientId,
-        builder: (_, id, __) =>
-            id.trim().isEmpty ? const OnboardingScreen() : const ScanHome(),
+      home: AnimatedBuilder(
+        animation: Listenable.merge(
+            [AppSettings.instance.clientId, AppSettings.instance.explored]),
+        builder: (_, __) {
+          final s = AppSettings.instance;
+          final ready = s.clientId.value.trim().isNotEmpty || s.explored.value;
+          return ready ? const ScanHome() : const OnboardingScreen();
+        },
       ),
     );
   }
@@ -168,7 +172,13 @@ class _ScanHomeState extends State<ScanHome> {
   @override
   void initState() {
     super.initState();
-    _connectSpotify();
+    // mobile_scanner 6+ no longer auto-starts the camera with the widget.
+    unawaited(_controller.start());
+    if (AppSettings.instance.hasClientId) {
+      _connectSpotify();
+    } else {
+      _spotifyStatus = 'Tap to connect';
+    }
     for (final src in AppSettings.instance.deckSources.value) {
       _resolver.loadSource(src).catchError((_) => 0);
     }
@@ -710,10 +720,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             icon: const Icon(Icons.playlist_add),
             label: const Text('Deck sources (optional)'),
           ),
+          const SizedBox(height: 28),
+          const Divider(),
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton(
+              onPressed: _skip,
+              child: const Text('Skip for now — explore without Spotify'),
+            ),
+          ),
         ],
       ),
     ),
   );
+  }
+
+  Future<void> _skip() async {
+    await AppSettings.instance.setExplored(true);
+    if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
   }
 
   void _copy(String text) {
