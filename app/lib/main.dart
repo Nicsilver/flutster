@@ -167,33 +167,64 @@ class PrimaryButton extends StatelessWidget {
 }
 
 /// Soft corner glows over the plum background (mirrors the web radial glows).
-/// Scaffold background plus the decade spectrum strip along the top edge —
-/// the same brand element as the card-maker web page.
+/// Plain scaffold-colored background. (An earlier version drew the spectrum
+/// strip along the top edge, but rounded display corners clip it — the
+/// spectrum lives on the primary buttons instead.)
 class DecadesBackground extends StatelessWidget {
   const DecadesBackground({super.key, required this.child});
   final Widget child;
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-            child: ColoredBox(
-                color: Theme.of(context).scaffoldBackgroundColor)),
-        Positioned.fill(child: child),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: IgnorePointer(
-            child: Container(
-              height: 4,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: decadeSpectrum),
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: child,
+    );
+  }
+}
+
+/// Primary action painted with the decade spectrum — GUESS and the setup pager.
+class SpectrumButton extends StatelessWidget {
+  const SpectrumButton({
+    super.key,
+    required this.child,
+    required this.onPressed,
+    this.padding = const EdgeInsets.symmetric(vertical: 16, horizontal: 22),
+  });
+  final Widget child;
+  final VoidCallback? onPressed;
+  final EdgeInsetsGeometry padding;
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient:
+            enabled ? const LinearGradient(colors: decadeSpectrum) : null,
+        color: enabled ? null : scheme.onSurface.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onPressed,
+          child: Padding(
+            padding: padding,
+            child: Center(
+              child: DefaultTextStyle.merge(
+                style: TextStyle(
+                    color: enabled
+                        ? Colors.white
+                        : scheme.onSurface.withValues(alpha: 0.4),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16),
+                child: child,
               ),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -497,14 +528,16 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     });
   }
 
-  Future<void> _save() async {
+  Future<void> _toggleSave() async {
     setState(() => _saving = true);
-    final ok = await _spotify.saveToLikedPlaylist(widget.track.spotifyUri);
+    final ok = _saved
+        ? await _spotify.removeFromLikedPlaylist(widget.track.spotifyUri)
+        : await _spotify.saveToLikedPlaylist(widget.track.spotifyUri);
     if (!mounted) return;
-    // No toast — the icon flipping to a green check is the confirmation.
+    // No toast — the icon flipping between + and the green check is the confirmation.
     setState(() {
       _saving = false;
-      _saved = ok;
+      if (ok) _saved = !_saved;
     });
   }
 
@@ -539,9 +572,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   IconButton(
                     iconSize: 40,
                     tooltip: _saved
-                        ? 'Already in ${SpotifyService.likedPlaylistName}'
+                        ? 'Remove from ${SpotifyService.likedPlaylistName}'
                         : 'Save to ${SpotifyService.likedPlaylistName}',
-                    onPressed: (_saving || _saved) ? null : _save,
+                    onPressed: _saving ? null : _toggleSave,
                     icon: _saving
                         ? const SizedBox(
                             width: 26,
@@ -557,9 +590,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 ],
               ),
               const Spacer(),
-              const SpectrumMask(
-                child: Icon(Icons.music_note, size: 120, color: Colors.white),
-              ),
+              Icon(Icons.music_note,
+                  size: 120,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.85)),
               const SizedBox(height: 28),
               BrandText('Guess the year',
                   style: Theme.of(context)
@@ -606,7 +642,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: PrimaryButton(
+                child: SpectrumButton(
                   onPressed: _guess,
                   padding: const EdgeInsets.symmetric(vertical: 30),
                   child: const Text('GUESS',
@@ -912,12 +948,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: last
                         ? AnimatedBuilder(
                             animation: _c,
-                            builder: (_, __) => PrimaryButton(
+                            builder: (_, __) => SpectrumButton(
                               onPressed: _c.text.trim().isEmpty ? null : _save,
                               child: const Text('Save & continue'),
                             ),
                           )
-                        : PrimaryButton(
+                        : SpectrumButton(
                             onPressed: () => _go(1),
                             child: const Text('Next'),
                           ),

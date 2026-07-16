@@ -9,6 +9,7 @@ const pad2 = (y) => String(y % 100).padStart(2, '0');
 // Decade buckets drive all color in the UI: index into DEC_CLASSES/DEC_VARS.
 const DEC_CLASSES = ['dec60', 'dec70', 'dec80', 'dec90', 'dec00', 'dec10'];
 const DEC_VARS = ['--dec60', '--dec70', '--dec80', '--dec90', '--dec00', '--dec10'];
+const DEC_LABELS = ['’60s', '’70s', '’80s', '’90s', '’00s', '’10s+'];
 function decIdx(year) {
   if (!year) return -1;
   if (year < 1970) return 0;
@@ -548,6 +549,17 @@ function TimelineStrip({ tracks }) {
   const [hover, setHover] = useState(null);
   const ys = yearStats(tracks);
   if (ys.dated < 2) return null;
+  // Consecutive same-decade runs become labeled tick segments under the bars.
+  const segs = [];
+  const total = ys.span + 1;
+  let start = 0;
+  for (let i = 1; i <= total; i++) {
+    if (i === total || decIdx(ys.minY + i) !== decIdx(ys.minY + start)) {
+      const idx = decIdx(ys.minY + start);
+      segs.push({ pct: ((i - start) / total) * 100, cls: DEC_CLASSES[idx], label: DEC_LABELS[idx] });
+      start = i;
+    }
+  }
   return (
     <div className="st-tl">
       <div className="st-tl-head">
@@ -567,6 +579,13 @@ function TimelineStrip({ tracks }) {
             onMouseEnter={() => setHover(d)}
             title={`${d.y} · ${d.c} song${d.c !== 1 ? 's' : ''}`}
           />
+        ))}
+      </div>
+      <div className="st-ticks">
+        {segs.map((s, i) => (
+          <span key={i} className={s.cls} style={{ width: `${s.pct}%` }}>
+            {s.pct > 7 ? s.label : ''}
+          </span>
         ))}
       </div>
     </div>

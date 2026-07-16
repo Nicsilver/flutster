@@ -14,8 +14,8 @@ class AppSettings {
 
   final ValueNotifier<bool> start30 = ValueNotifier(false);
 
-  // 'light' | 'dark' | 'system'. Light is the brand default, matching the web.
-  final ValueNotifier<String> themeMode = ValueNotifier('light');
+  // 'light' | 'dark' | 'system'. Follows the system by default.
+  final ValueNotifier<String> themeMode = ValueNotifier('system');
 
   // Each user supplies their own Spotify app's Client ID (see OnboardingScreen).
   final ValueNotifier<String> clientId = ValueNotifier('');
@@ -31,7 +31,7 @@ class AppSettings {
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     start30.value = p.getBool(_kStart30) ?? false;
-    themeMode.value = p.getString(_kThemeMode) ?? 'light';
+    themeMode.value = p.getString(_kThemeMode) ?? 'system';
     clientId.value = p.getString(_kClientId) ?? '';
     explored.value = p.getBool(_kExplored) ?? false;
     deckSources.value =

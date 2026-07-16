@@ -209,8 +209,8 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .st-plrow:hover { background: var(--active); }
 .st-plrow.active { background: var(--active); border-color: var(--line); }
 .st-plc {
-  width: 34px; height: 34px; border-radius: 7px; flex: none; overflow: hidden;
-  display: grid; place-items: center; color: var(--muted); font-size: 15px;
+  width: 46px; height: 46px; border-radius: 9px; flex: none; overflow: hidden;
+  display: grid; place-items: center; color: var(--muted); font-size: 19px;
   background: var(--active); border: 1px solid var(--line);
 }
 .st-plc img { width: 100%; height: 100%; object-fit: cover; }
@@ -246,6 +246,11 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .st-bars .bar { flex: 1 1 0; min-height: 3px; border-radius: 2px 2px 0 0; background: var(--dc, var(--bar)); transition: filter 0.12s; }
 .st-bars .bar:hover { filter: brightness(1.2); }
 .st-bars .bar.zero { background: var(--bar); min-height: 3px; opacity: 0.5; }
+.st-ticks { display: flex; margin-top: 6px; }
+.st-ticks span {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.04em; color: var(--dc, var(--muted));
+  text-align: center; overflow: hidden; white-space: nowrap; min-width: 0;
+}
 
 /* deck */
 .backs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 4px; }

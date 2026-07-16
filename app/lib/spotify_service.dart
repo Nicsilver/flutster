@@ -186,4 +186,23 @@ class SpotifyService {
     ids.add(_trackId(trackUri));
     return true;
   }
+
+  Future<bool> removeFromLikedPlaylist(String trackUri) async {
+    final pid = await _likedPlaylistId();
+    if (pid == null) return false;
+    final ids = await _loadPlaylistTrackIds();
+    if (!ids.contains(_trackId(trackUri))) return true;
+    final res = await _send(
+      'DELETE',
+      'https://api.spotify.com/v1/playlists/$pid/tracks',
+      body: {
+        'tracks': [
+          {'uri': trackUri}
+        ]
+      },
+    );
+    if (res == null) return false;
+    ids.remove(_trackId(trackUri));
+    return true;
+  }
 }
