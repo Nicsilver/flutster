@@ -24,20 +24,27 @@ class FlutsterApp extends StatelessWidget {
   const FlutsterApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutster',
-      debugShowCheckedModeBanner: false,
-      theme: decadesTheme(Brightness.light),
-      darkTheme: decadesTheme(Brightness.dark),
-      themeMode: ThemeMode.system,
-      home: AnimatedBuilder(
-        animation: Listenable.merge(
-            [AppSettings.instance.clientId, AppSettings.instance.explored]),
-        builder: (_, __) {
-          final s = AppSettings.instance;
-          final ready = s.clientId.value.trim().isNotEmpty || s.explored.value;
-          return ready ? const ScanHome() : const OnboardingScreen();
-        },
+    return ValueListenableBuilder<String>(
+      valueListenable: AppSettings.instance.themeMode,
+      builder: (context, mode, _) => MaterialApp(
+        title: 'Flutster',
+        debugShowCheckedModeBanner: false,
+        theme: decadesTheme(Brightness.light),
+        darkTheme: decadesTheme(Brightness.dark),
+        themeMode: mode == 'dark'
+            ? ThemeMode.dark
+            : mode == 'system'
+                ? ThemeMode.system
+                : ThemeMode.light,
+        home: AnimatedBuilder(
+          animation: Listenable.merge(
+              [AppSettings.instance.clientId, AppSettings.instance.explored]),
+          builder: (_, __) {
+            final s = AppSettings.instance;
+            final ready = s.clientId.value.trim().isNotEmpty || s.explored.value;
+            return ready ? const ScanHome() : const OnboardingScreen();
+          },
+        ),
       ),
     );
   }
@@ -67,7 +74,11 @@ ThemeData decadesTheme(Brightness b) {
       brightness: b,
       primary: ink, // ink-on-paper buttons, like the web
       onPrimary: bg,
-      secondary: teal,
+      secondary: teal, // control-active color only (toggles), like the web
+      // Informational accents (labels, links, copy icons) use the decade blue —
+      // teal on text read as stray green.
+      tertiary:
+          light ? const Color(0xFF1C7ED6) : const Color(0xFF4AA8FF),
       surface: panel,
       onSurface: ink,
     ),
@@ -78,6 +89,22 @@ ThemeData decadesTheme(Brightness b) {
       elevation: 0,
     ),
   );
+}
+
+/// Paints [child] with the decade spectrum — the brand gradient, used only for
+/// the wordmark and the odd hero glyph.
+class SpectrumMask extends StatelessWidget {
+  const SpectrumMask({super.key, required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (r) => const LinearGradient(colors: decadeSpectrum)
+          .createShader(Rect.fromLTWH(0, 0, r.width, r.height)),
+      child: child,
+    );
+  }
 }
 
 /// Brand/headline text; [color] overrides for surfaces like the camera preview.
@@ -291,10 +318,13 @@ class _ScanHomeState extends State<ScanHome> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const BrandText('Flutster',
-                          color: Colors.white,
-                          style: TextStyle(
-                              fontSize: 26, fontWeight: FontWeight.bold)),
+                      const SpectrumMask(
+                        child: Text('Flutster',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold)),
+                      ),
                       Row(children: [
                         _StatusChip(
                           status: _spotifyStatus,
@@ -527,8 +557,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 ],
               ),
               const Spacer(),
-              Icon(Icons.music_note,
-                  size: 120, color: Theme.of(context).colorScheme.secondary),
+              const SpectrumMask(
+                child: Icon(Icons.music_note, size: 120, color: Colors.white),
+              ),
               const SizedBox(height: 28),
               BrandText('Guess the year',
                   style: Theme.of(context)
@@ -611,6 +642,34 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
         children: [
+          const _SettingsHeader('Appearance'),
+          _SettingsGroup(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+              child: Row(
+                children: [
+                  const Expanded(child: Text('Theme')),
+                  ValueListenableBuilder<String>(
+                    valueListenable: s.themeMode,
+                    builder: (context, mode, _) => SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'light', label: Text('Light')),
+                        ButtonSegment(value: 'dark', label: Text('Dark')),
+                        ButtonSegment(value: 'system', label: Text('Auto')),
+                      ],
+                      selected: {mode},
+                      onSelectionChanged: (v) => s.setThemeMode(v.first),
+                      showSelectedIcon: false,
+                      style: const ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]),
           const _SettingsHeader('Playback'),
           _SettingsGroup(children: [
             ValueListenableBuilder<bool>(
@@ -704,7 +763,7 @@ class _SettingsHeader extends StatelessWidget {
             fontSize: 11.5,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
-            color: Theme.of(context).colorScheme.secondary),
+            color: Theme.of(context).colorScheme.tertiary),
       ),
     );
   }
@@ -830,7 +889,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   height: 7,
                   decoration: BoxDecoration(
                     color: on
-                        ? Theme.of(context).colorScheme.secondary
+                        ? Theme.of(context).colorScheme.tertiary
                         : Theme.of(context)
                             .colorScheme
                             .onSurface
@@ -881,7 +940,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 fontSize: 11.5,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: Theme.of(context).colorScheme.secondary)),
+                color: Theme.of(context).colorScheme.tertiary)),
         const SizedBox(height: 5),
         Text(title,
             style: Theme.of(context)
@@ -930,7 +989,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   icon: Icon(Icons.copy,
-                      size: 18, color: Theme.of(context).colorScheme.secondary),
+                      size: 18, color: Theme.of(context).colorScheme.tertiary),
                   onPressed: () => _copy(value),
                 ),
               ],
@@ -978,7 +1037,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Row(
           children: [
             Icon(Icons.check_box_outlined,
-                size: 18, color: Theme.of(context).colorScheme.secondary),
+                size: 18, color: Theme.of(context).colorScheme.tertiary),
             const SizedBox(width: 8),
             Expanded(
               child: Text('Under Which API/SDKs, tick Web API and Android.',
@@ -1008,10 +1067,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.10),
+          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.10),
           border: Border.all(
               color:
-                  Theme.of(context).colorScheme.secondary.withValues(alpha: 0.35)),
+                  Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.35)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Text(

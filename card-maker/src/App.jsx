@@ -18,11 +18,19 @@ function decIdx(year) {
 const decClass = (year) => DEC_CLASSES[decIdx(year)] || '';
 
 // Decade fingerprints (the little era-mix bar under each playlist) need the
-// tracks' years, so they're computed when a playlist is first loaded and cached.
+// tracks' years. They're lazy-loaded for every playlist in the background and
+// cached as { [id]: { n: trackTotal, fp: [six counts] } } — n lets a changed
+// playlist (different track total) invalidate its entry.
 const FP_KEY = 'flutster_fp';
 function loadFpMap() {
   try {
-    return JSON.parse(localStorage.getItem(FP_KEY) || '{}');
+    const raw = JSON.parse(localStorage.getItem(FP_KEY) || '{}');
+    const out = {};
+    for (const [id, v] of Object.entries(raw)) {
+      // Migrate the first release's bare-array format; n:-1 forces a refresh.
+      out[id] = Array.isArray(v) ? { n: -1, fp: v } : v;
+    }
+    return out;
   } catch {
     return {};
   }
@@ -34,6 +42,46 @@ function fingerprint(tracks) {
     if (i >= 0) counts[i]++;
   }
   return counts;
+}
+
+// Track cache: skip re-fetching a playlist whose track total hasn't changed.
+// The total is a cheap staleness proxy (edits that keep the count slip through
+// until the count next changes — acceptable for a print tool).
+const PL_KEY = 'flutster_playlists';
+function loadPlCache() {
+  try {
+    return JSON.parse(localStorage.getItem(PL_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+function plCacheGet(id, count) {
+  const e = loadPlCache()[id];
+  if (!e || count == null || e.count !== count) return null;
+  return {
+    name: e.name,
+    tracks: e.tracks.map(([uri, title, artist, year]) => ({ uri, title, artist, year })),
+  };
+}
+function plCachePut(id, count, name, tracks) {
+  if (count == null) return;
+  const cache = loadPlCache();
+  cache[id] = {
+    count,
+    name,
+    ts: Date.now(),
+    tracks: tracks.map((t) => [t.uri, t.title, t.artist, t.year]),
+  };
+  const ids = Object.keys(cache);
+  if (ids.length > 40) {
+    ids.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
+    for (const old of ids.slice(0, ids.length - 40)) delete cache[old];
+  }
+  try {
+    localStorage.setItem(PL_KEY, JSON.stringify(cache));
+  } catch {
+    localStorage.removeItem(PL_KEY); // over quota: drop the cache, not the app
+  }
 }
 
 // Songs-per-year stats used by the timeline strip.
@@ -56,24 +104,18 @@ const SHUFFLE_ICON = (
   </svg>
 );
 
+// Light is the default; dark is a stored opt-in.
 function useTheme() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('flutster_theme') || '');
+  const [theme, setTheme] = useState(() => localStorage.getItem('flutster_theme') || 'light');
   useEffect(() => {
-    if (theme) document.documentElement.dataset.theme = theme;
-    else delete document.documentElement.dataset.theme;
+    document.documentElement.dataset.theme = theme;
   }, [theme]);
   const toggle = () => {
-    const dark = theme
-      ? theme === 'dark'
-      : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const next = dark ? 'light' : 'dark';
+    const next = theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('flutster_theme', next);
     setTheme(next);
   };
-  const isDark = theme
-    ? theme === 'dark'
-    : typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  return { isDark, toggle };
+  return { isDark: theme === 'dark', toggle };
 }
 
 export default function App() {
@@ -116,6 +158,36 @@ export default function App() {
       .finally(() => setLoadingLists(false));
   }, [token]);
 
+  // Lazy-load a fingerprint for every playlist. Sequential on purpose — this
+  // walks each playlist's full track list, so keep it gentle on the rate limit.
+  useEffect(() => {
+    if (!token || myLists.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const pl of myLists) {
+        if (cancelled) return;
+        const known = loadFpMap()[pl.id];
+        if (known && known.n === pl.count) continue;
+        let tracks = plCacheGet(pl.id, pl.count)?.tracks;
+        if (!tracks) {
+          try {
+            const data = await fetchPlaylist(pl.uri, token);
+            tracks = data.tracks;
+            plCachePut(pl.id, pl.count, data.name, tracks);
+          } catch (e) {
+            if (e.message === 'AUTH') return; // token died; foreground handles it
+            continue;
+          }
+        }
+        if (cancelled) return;
+        setFp(pl.id, pl.count, fingerprint(tracks));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, myLists]);
+
   const marginMm = 8; // auto — fixed page margin
   const gapMm = 2; // auto — fixed gap between cards
   // "Cards per row" is the only size control; the card size (square) is derived to fit A4.
@@ -150,23 +222,34 @@ export default function App() {
   const q = railQuery.trim().toLowerCase();
   const shownLists = !q || isLink ? myLists : myLists.filter((pl) => pl.name.toLowerCase().includes(q));
 
+  function setFp(id, n, fp) {
+    setFpMap((prev) => {
+      const next = { ...prev, [id]: { n, fp } };
+      try {
+        localStorage.setItem(FP_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }
+
   async function onLoad(link = url) {
     setError('');
     setPlaylist(null);
     setLoading(true);
     try {
-      const data = await fetchPlaylist(link, token);
+      const id = parsePlaylistId(link);
+      const count = id ? myLists.find((p) => p.id === id)?.count ?? null : null;
+      let data = id ? plCacheGet(id, count) : null;
+      if (!data) {
+        data = await fetchPlaylist(link, token);
+        if (id) plCachePut(id, count, data.name, data.tracks);
+      }
       if (data.tracks.length === 0) throw new Error('No playable tracks found in that playlist.');
       setPlaylist(data);
       setOrder(data.tracks.map((_, i) => i));
       setExcluded(new Set());
       setSheetPage(0);
-      const id = parsePlaylistId(link);
-      if (id) {
-        const next = { ...loadFpMap(), [id]: fingerprint(data.tracks) };
-        localStorage.setItem(FP_KEY, JSON.stringify(next));
-        setFpMap(next);
-      }
+      if (id) setFp(id, count ?? -1, fingerprint(data.tracks));
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
@@ -291,7 +374,7 @@ export default function App() {
                 <div className="st-plc">{pl.image ? <img src={pl.image} alt="" /> : <span>♪</span>}</div>
                 <div className="st-plmeta">
                   <b>{pl.name}</b>
-                  <Fingerprint counts={fpMap[pl.id]} />
+                  <Fingerprint counts={fpMap[pl.id]?.fp} />
                   <span>{pl.count} tracks</span>
                 </div>
               </button>

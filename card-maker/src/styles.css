@@ -13,6 +13,7 @@
   --paper: #fffdf8;
   --paper-ink: #26221c;
   --paper-line: #cfc6b2;
+  --paper-sub: #6f6555;
   --tile-shadow: 0 1px 3px rgba(60, 50, 30, 0.06);
   --sheet-shadow: 0 5px 16px rgba(60, 50, 30, 0.2);
   --dec60: #e3a008;
@@ -24,31 +25,8 @@
   --spectrum: linear-gradient(90deg, var(--dec60), var(--dec70) 18%, var(--dec80) 38%, var(--dec90) 58%, var(--dec00) 78%, var(--dec10));
 }
 
-/* Dark tokens twice: once for OS preference (no explicit choice), once for the
-   explicit toggle — media queries and attribute selectors can't share a block. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #15171e;
-    --ink: #f0ede6;
-    --muted: #8b8e99;
-    --line: #2a2e3a;
-    --panel: #1d2029;
-    --field: #181b23;
-    --active: #262a36;
-    --btn: #f0ede6;
-    --btn-fg: #15171e;
-    --link: #4aa8ff;
-    --bar: #3a3f4d;
-    --tile-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-    --sheet-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-    --dec60: #ffb224;
-    --dec70: #ff7043;
-    --dec80: #ff5c93;
-    --dec90: #22c99b;
-    --dec00: #4aa8ff;
-    --dec10: #9775fa;
-  }
-}
+/* Light is the default regardless of OS preference; dark is opt-in via the
+   topbar toggle, which stamps data-theme on the root element. */
 :root[data-theme='dark'] {
   --bg: #15171e;
   --ink: #f0ede6;
@@ -63,6 +41,10 @@
   --bar: #3a3f4d;
   --tile-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   --sheet-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --paper: #1f232c;
+  --paper-ink: #f0ede6;
+  --paper-line: #3a3f4d;
+  --paper-sub: #8b8e99;
   --dec60: #ffb224;
   --dec70: #ff7043;
   --dec80: #ff5c93;
@@ -89,7 +71,7 @@ body::before {
 
 .wrap { max-width: 880px; margin: 0 auto; padding: 38px 22px 76px; }
 .wrap-narrow { max-width: 600px; }
-.wrap-wide { max-width: 1240px; }
+.wrap-wide { max-width: 1340px; }
 
 /* decade coloring (JS assigns .dec60 … .dec10) */
 .dec60 { --dc: var(--dec60); }
@@ -192,14 +174,15 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 ::-webkit-scrollbar-thumb { background: var(--bar); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
 
 /* ===================== Card studio (three open zones) ===================== */
-.studio { display: grid; grid-template-columns: 215px minmax(0, 1fr) 230px; gap: 28px; align-items: start; }
+.studio { display: grid; grid-template-columns: 265px minmax(0, 1fr) 270px; gap: 28px; align-items: start; }
 @media (max-width: 900px) { .studio { grid-template-columns: 1fr; } .st-right { position: static; } }
 
 .st-rail { align-self: start; min-width: 0; }
 .st-right { position: sticky; top: 24px; }
 .st-rh {
   font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--muted); margin: 2px 2px 10px; display: flex; align-items: center; gap: 8px;
+  color: var(--muted); margin: 2px 2px 10px; display: flex; align-items: center;
+  justify-content: space-between; gap: 8px;
 }
 .badge {
   border: 1px solid var(--line); color: var(--muted);
@@ -320,7 +303,7 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .sheet-cell.cut { border: 1px dashed var(--paper-line); }
 .sheet-cell .yr { font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.15; font-size: 15px; color: var(--dc, var(--paper-ink)); }
 .sheet-cell b { font-size: 7.5px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sheet-cell i { font-style: normal; font-size: 7px; color: #6f6555; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-cell i { font-style: normal; font-size: 7px; color: var(--paper-sub); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sheet.dense .sheet-cell .yr { font-size: 11px; }
 .sheet.dense .sheet-cell i { display: none; }
 .sheet.tiny .sheet-cell .yr { font-size: 9px; }

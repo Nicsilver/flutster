@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Flutster Card Maker</title>
     <meta name="description" content="Turn a Spotify playlist into printable double-sided Flutster cards — QR fronts, year · artist · title backs. Free, in your browser." />
-    <meta name="theme-color" content="#f7f2e9" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#15171e" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f7f2e9" />
     <script>
-      // Apply the saved theme before first paint to avoid a flash.
+      // Apply the saved theme before first paint to avoid a flash. Light is
+      // the default; dark is an explicit choice stored by the toggle.
       try {
-        var t = localStorage.getItem('flutster_theme');
-        if (t) document.documentElement.dataset.theme = t;
+        document.documentElement.dataset.theme =
+          localStorage.getItem('flutster_theme') || 'light';
       } catch (e) {}
     </script>
 
