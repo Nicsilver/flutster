@@ -10,8 +10,9 @@ const DECS = ['#ffb224', '#ff7043', '#ff5c93', '#22c99b', '#4aa8ff', '#9775fa'];
 // Light-set hues + ink, for the bare mark on paper backgrounds.
 const DECS_LIGHT = ['#e3a008', '#e8590c', '#d6336c', '#0ca678', '#1c7ed6', '#7048e8'];
 const INK_LIGHT = '#26221c';
-const BG = '#15171e';    // ink-blue (web dark --bg)
-const PANEL = '#1d2029'; // web dark --panel
+const BG = '#15171e';    // ink-blue (web dark --bg) — banner ground
+const CREAM = '#f7f2e9'; // paper (web light --bg) — icon tile
+const EDGE = '#e5ddcd';  // hairline so the cream tile holds on white surfaces
 const INK = '#f0ede6';   // paper (web dark --ink)
 
 const CX = 256, CY = 256, R = 118;
@@ -66,11 +67,11 @@ const spectrumGrad = (id) =>
 // --- Full icon (squircle bg + waveform): legacy launcher, favicon, Play Store, apple-touch ---
 function fullIconSVG({ rounded = true } = {}) {
   const bg = rounded
-    ? `<rect width="512" height="512" rx="${R}" fill="${BG}"/>`
-    : `<rect width="512" height="512" fill="${BG}"/>`;
+    ? `<rect x="3" y="3" width="506" height="506" rx="${R}" fill="${CREAM}" stroke="${EDGE}" stroke-width="6"/>`
+    : `<rect width="512" height="512" fill="${CREAM}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
     ${bg}
-    ${waveGroup({})}
+    ${waveGroup({ palette: DECS_LIGHT })}
   </svg>`;
 }
 
@@ -78,7 +79,7 @@ function fullIconSVG({ rounded = true } = {}) {
 function foregroundSVG() {
   // Longer bars: keep the art inside the adaptive-icon safe zone (~170px radius).
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    ${waveGroup({ scale: 1.0 })}
+    ${waveGroup({ palette: DECS_LIGHT, scale: 1.0 })}
   </svg>`;
 }
 
@@ -99,8 +100,8 @@ function markSVG({ palette }) {
 // --- Maskable web icon: art inside PWA safe zone (~80%), full-bleed bg ---
 function maskableSVG() {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    <rect width="512" height="512" fill="${BG}"/>
-    ${waveGroup({ scale: 0.82 })}
+    <rect width="512" height="512" fill="${CREAM}"/>
+    ${waveGroup({ palette: DECS_LIGHT, scale: 0.82 })}
   </svg>`;
 }
 
@@ -116,8 +117,8 @@ function bannerSVG(w, h) {
     <rect width="${w}" height="${h}" fill="${BG}"/>
     <rect width="${w}" height="${strip}" fill="url(#gSpec)"/>
     <g transform="translate(${ix} ${iy}) scale(${(iconSize / 512).toFixed(4)})">
-      <rect width="512" height="512" rx="${R}" fill="${PANEL}"/>
-      ${waveGroup({})}
+      <rect width="512" height="512" rx="${R}" fill="${CREAM}"/>
+      ${waveGroup({ palette: DECS_LIGHT })}
     </g>
     <text x="${tx}" y="${Math.round(h * 0.48)}" font-family="Arial, 'Segoe UI', sans-serif" font-weight="800" font-size="${Math.round(h * 0.15)}" fill="${INK}" letter-spacing="-2">Flutster</text>
     <text x="${tx + 3}" y="${Math.round(h * 0.48) + Math.round(h * 0.1)}" font-family="Arial, 'Segoe UI', sans-serif" font-weight="600" font-size="${Math.round(h * 0.05)}" fill="${INK}" opacity="0.75">Scan a card. Play the song. Guess the year.</text>
