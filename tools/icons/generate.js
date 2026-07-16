@@ -23,9 +23,11 @@ function amp(k, N) {
 }
 
 // Build the waveform + center ring group. Bars sweep the decade hues clockwise
-// from the top; pass barColor to override (monochrome). scale grows from centre.
+// from the top; pass barColor/ringColor to override (monochrome). Without a
+// ringColor the ring is six arc segments in the same hues, aligned with the
+// bar sextants above them. scale grows from centre.
 function waveGroup({ ringColor, barColor, scale = 1, palette = DECS }) {
-  const N = 40, inner = 88, maxLen = 60, width = 14;
+  const N = 40, inner = 88, maxLen = 82, width = 14, ringR = 54;
   let bars = '';
   for (let k = 0; k < N; k++) {
     const a = -Math.PI / 2 + (k / N) * Math.PI * 2;
@@ -36,7 +38,20 @@ function waveGroup({ ringColor, barColor, scale = 1, palette = DECS }) {
     const color = barColor || palette[Math.min(palette.length - 1, Math.floor((k / N) * palette.length))];
     bars += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`;
   }
-  const ring = `<circle cx="${CX}" cy="${CY}" r="54" fill="none" stroke="${ringColor}" stroke-width="14"/>`;
+  let ring;
+  if (ringColor) {
+    ring = `<circle cx="${CX}" cy="${CY}" r="${ringR}" fill="none" stroke="${ringColor}" stroke-width="14"/>`;
+  } else {
+    ring = '';
+    const seg = (Math.PI * 2) / palette.length;
+    for (let i = 0; i < palette.length; i++) {
+      const a0 = -Math.PI / 2 + i * seg;
+      const a1 = a0 + seg + 0.02; // slight overlap hides antialiasing seams
+      const x0 = (CX + ringR * Math.cos(a0)).toFixed(2), y0 = (CY + ringR * Math.sin(a0)).toFixed(2);
+      const x1 = (CX + ringR * Math.cos(a1)).toFixed(2), y1 = (CY + ringR * Math.sin(a1)).toFixed(2);
+      ring += `<path d="M ${x0} ${y0} A ${ringR} ${ringR} 0 0 1 ${x1} ${y1}" fill="none" stroke="${palette[i]}" stroke-width="14"/>`;
+    }
+  }
   const inner2 = bars + ring;
   if (scale === 1) return inner2;
   return `<g transform="translate(${CX} ${CY}) scale(${scale}) translate(${-CX} ${-CY})">${inner2}</g>`;
@@ -55,28 +70,29 @@ function fullIconSVG({ rounded = true } = {}) {
     : `<rect width="512" height="512" fill="${BG}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
     ${bg}
-    ${waveGroup({ ringColor: INK })}
+    ${waveGroup({})}
   </svg>`;
 }
 
 // --- Adaptive foreground (transparent, art enlarged into safe zone) ---
 function foregroundSVG() {
+  // Longer bars: keep the art inside the adaptive-icon safe zone (~170px radius).
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    ${waveGroup({ ringColor: INK, scale: 1.18 })}
+    ${waveGroup({ scale: 1.0 })}
   </svg>`;
 }
 
 // --- Adaptive monochrome (themed icons, Android 13+): all white on transparent ---
 function monochromeSVG() {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    ${waveGroup({ ringColor: '#ffffff', barColor: '#ffffff', scale: 1.18 })}
+    ${waveGroup({ ringColor: '#ffffff', barColor: '#ffffff', scale: 1.0 })}
   </svg>`;
 }
 
 // --- Bare mark (transparent, no tile): topbar logo on the web app, one per theme ---
-function markSVG({ palette, ringColor }) {
+function markSVG({ palette }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    ${waveGroup({ ringColor, palette, scale: 1.6 })}
+    ${waveGroup({ palette, scale: 1.42 })}
   </svg>`;
 }
 
@@ -84,7 +100,7 @@ function markSVG({ palette, ringColor }) {
 function maskableSVG() {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
     <rect width="512" height="512" fill="${BG}"/>
-    ${waveGroup({ ringColor: INK, scale: 0.82 })}
+    ${waveGroup({ scale: 0.82 })}
   </svg>`;
 }
 
@@ -101,7 +117,7 @@ function bannerSVG(w, h) {
     <rect width="${w}" height="${strip}" fill="url(#gSpec)"/>
     <g transform="translate(${ix} ${iy}) scale(${(iconSize / 512).toFixed(4)})">
       <rect width="512" height="512" rx="${R}" fill="${PANEL}"/>
-      ${waveGroup({ ringColor: INK })}
+      ${waveGroup({})}
     </g>
     <text x="${tx}" y="${Math.round(h * 0.48)}" font-family="Arial, 'Segoe UI', sans-serif" font-weight="800" font-size="${Math.round(h * 0.15)}" fill="${INK}" letter-spacing="-2">Flutster</text>
     <text x="${tx + 3}" y="${Math.round(h * 0.48) + Math.round(h * 0.1)}" font-family="Arial, 'Segoe UI', sans-serif" font-weight="600" font-size="${Math.round(h * 0.05)}" fill="${INK}" opacity="0.75">Scan a card. Play the song. Guess the year.</text>
@@ -147,11 +163,11 @@ const CM = (p) => path.join(REPO, 'card-maker', p);
   // Bare theme-matched marks for the topbar (no dark tile on the paper theme).
   fs.writeFileSync(
     CM('public/mark-light.svg'),
-    markSVG({ palette: DECS_LIGHT, ringColor: INK_LIGHT }).trim());
+    markSVG({ palette: DECS_LIGHT }).trim());
   console.log('  ✓ card-maker/public/mark-light.svg');
   fs.writeFileSync(
     CM('public/mark-dark.svg'),
-    markSVG({ palette: DECS, ringColor: INK }).trim());
+    markSVG({ palette: DECS }).trim());
   console.log('  ✓ card-maker/public/mark-dark.svg');
   write(CM('public/favicon-16x16.png'), renderPng(fullIconSVG(), 16));
   write(CM('public/favicon-32x32.png'), renderPng(fullIconSVG(), 32));
