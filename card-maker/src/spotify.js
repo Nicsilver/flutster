@@ -143,7 +143,7 @@ export async function fetchPlaylist(url, token) {
   for (;;) {
     const page = await api(
       `/playlists/${id}/tracks?limit=100&offset=${offset}&fields=${encodeURIComponent(
-        'items(track(uri,id,name,artists(name),album(release_date))),next'
+        'items(track(uri,id,name,artists(name),album(release_date),external_ids(isrc))),next'
       )}`,
       token
     );
@@ -157,6 +157,7 @@ export async function fetchPlaylist(url, token) {
         title: t.name || '',
         artist: (t.artists || []).map((a) => a.name).join(', '),
         year,
+        isrc: t.external_ids?.isrc || '',
       });
     }
     if (!page.next) break;

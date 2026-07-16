@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, redirectUri, getClientId, setClientId, parsePlaylistId } from './spotify.js';
+import { verifyYears, saveOverride, plausibleYear } from './years.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
 import { cardColors, rz, INK } from './cardstyle.js';
 
@@ -62,7 +63,7 @@ function plCacheGet(id, count) {
   if (!e || count == null || e.count !== count) return null;
   return {
     name: e.name,
-    tracks: e.tracks.map(([uri, title, artist, year]) => ({ uri, title, artist, year })),
+    tracks: e.tracks.map(([uri, title, artist, year, isrc]) => ({ uri, title, artist, year, isrc: isrc || '' })),
   };
 }
 function plCachePut(id, count, name, tracks) {
@@ -72,7 +73,9 @@ function plCachePut(id, count, name, tracks) {
     count,
     name,
     ts: Date.now(),
-    tracks: tracks.map((t) => [t.uri, t.title, t.artist, t.year]),
+    // Cached years are Spotify's own (year0 when verification already ran) —
+    // corrections re-apply from the flutster_years cache on every load.
+    tracks: tracks.map((t) => [t.uri, t.title, t.artist, t.year0 ?? t.year, t.isrc || '']),
   };
   const ids = Object.keys(cache);
   if (ids.length > 40) {
@@ -133,7 +136,14 @@ export default function App() {
   const [loadingLists, setLoadingLists] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [fpMap, setFpMap] = useState(loadFpMap);
+  const [verif, setVerif] = useState(null);
+  const verifRun = useRef(0);
+  const verifCtrl = useRef(null);
+  const playlistRef = useRef(null);
   const theme = useTheme();
+  useEffect(() => {
+    playlistRef.current = playlist;
+  }, [playlist]);
 
   const [perRow, setPerRow] = useState(3);
   const [cut, setCut] = useState(true);
@@ -235,6 +245,64 @@ export default function App() {
     });
   }
 
+  // A verified year lands as: year = what the cards print, year0 = Spotify's
+  // claim, ysrc = where the correction came from ('mb'/'it'/'edit'), unv =
+  // nothing could confirm it. The earliest plausible year wins — a remaster
+  // album on Spotify often already carries the original date.
+  function applyYear(uri, y, src) {
+    setPlaylist((p) => {
+      if (!p) return p;
+      return {
+        ...p,
+        tracks: p.tracks.map((t) => {
+          if (t.uri !== uri) return t;
+          if (src === 'miss') return { ...t, unv: !t.ysrc };
+          const y0 = t.year0 ?? t.year;
+          const eff = src === 'edit' ? y : plausibleYear(y0) && y0 < y ? y0 : y;
+          return { ...t, year: eff, year0: y0, ysrc: eff !== y0 || src === 'edit' ? src : '', unv: false };
+        }),
+      };
+    });
+  }
+
+  function startVerify(data, id, count) {
+    const run = ++verifRun.current;
+    verifCtrl.current?.abort();
+    const ctrl = new AbortController();
+    verifCtrl.current = ctrl;
+    const spotifyYear = new Map(data.tracks.map((t) => [t.uri, t.year]));
+    let fixed = 0;
+    setVerif({ running: true, done: 0, total: 0, fixed: 0 });
+    verifyYears(data.tracks, {
+      signal: ctrl.signal,
+      onProgress: (done, total) => {
+        if (run === verifRun.current) setVerif((v) => ({ ...v, done, total }));
+      },
+      onUpdate: (uri, y, src) => {
+        if (run !== verifRun.current) return;
+        if (src === 'mb' || src === 'it') {
+          const sy = spotifyYear.get(uri) || 0;
+          const eff = plausibleYear(sy) && sy < y ? sy : y;
+          if (eff !== sy) fixed++;
+        }
+        applyYear(uri, y, src);
+      },
+    })
+      .catch(() => {})
+      .finally(() => {
+        if (run !== verifRun.current) return;
+        setVerif((v) => ({ ...v, running: false, fixed }));
+        // Corrections can move cards across decades — refresh the rail bar.
+        const tracks = playlistRef.current?.tracks;
+        if (id && tracks) setFp(id, count ?? -1, fingerprint(tracks));
+      });
+  }
+
+  function editYear(uri, y) {
+    saveOverride(uri, y);
+    applyYear(uri, y, 'edit');
+  }
+
   async function onLoad(link = url) {
     setError('');
     setPlaylist(null);
@@ -253,6 +321,7 @@ export default function App() {
       setExcluded(new Set());
       setSheetPage(0);
       if (id) setFp(id, count ?? -1, fingerprint(data.tracks));
+      startVerify(data, id, count);
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
@@ -402,6 +471,14 @@ export default function App() {
                 <span className="st-actmeta">
                   {tracks.length} cards · {pages} page{pages !== 1 ? 's' : ''}
                   {overCap > 0 && <> · {overCap} over cap</>}
+                  {verif?.running && (
+                    <span className="st-verif">
+                      {' '}· checking years{verif.total > 0 ? ` ${Math.min(verif.done, verif.total)}/${verif.total}` : '…'}
+                    </span>
+                  )}
+                  {verif && !verif.running && verif.fixed > 0 && (
+                    <span className="st-verif done"> · {verif.fixed} year{verif.fixed !== 1 ? 's' : ''} corrected</span>
+                  )}
                 </span>
                 <span className="grow" />
                 <button className="primary" onClick={() => download('fronts')} disabled={!!busy}>
@@ -434,7 +511,7 @@ export default function App() {
                       onClick={() => toggleCard(t._idx)}
                       title="Include / exclude"
                     >
-                      <span className="yr">{t.year || '—'}</span>
+                      <YearTag t={t} onEdit={editYear} />
                       <b>{t.artist}</b>
                       <i>{t.title}</i>
                       {state !== 'in' && <span className="cap-tag">{state === 'over' ? 'over cap' : 'off'}</span>}
@@ -605,6 +682,58 @@ function TimelineStrip({ tracks }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// Year on a deck card: shows corrections (struck-through Spotify year) and is
+// click-to-edit — the printed deck should never be hostage to bad metadata.
+function YearTag({ t, onEdit }) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState('');
+  const commit = () => {
+    const y = parseInt(v, 10);
+    if (plausibleYear(y) && y !== t.year) onEdit(t.uri, y);
+    setEditing(false);
+  };
+  if (editing) {
+    return (
+      <input
+        className="yr yr-in"
+        autoFocus
+        value={v}
+        inputMode="numeric"
+        maxLength={4}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => setV(e.target.value.replace(/\D/g, ''))}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') setEditing(false);
+        }}
+      />
+    );
+  }
+  const corrected = t.ysrc && t.ysrc !== 'edit' && t.year0 > 0 && t.year0 !== t.year;
+  const title = corrected
+    ? `Spotify said ${t.year0} — corrected via ${t.ysrc === 'mb' ? 'MusicBrainz' : 'iTunes'}. Click to edit.`
+    : t.ysrc === 'edit'
+    ? 'Edited by you — click to change.'
+    : t.unv
+    ? 'Could not verify this year — click to edit.'
+    : 'Click to edit the year.';
+  return (
+    <span
+      className={'yr' + (corrected ? ' yr-fix' : '') + (t.ysrc === 'edit' ? ' yr-edited' : '') + (t.unv ? ' yr-unv' : '')}
+      title={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        setV(String(t.year || ''));
+        setEditing(true);
+      }}
+    >
+      {t.year || '—'}
+      {corrected && <s>{t.year0}</s>}
+    </span>
   );
 }
 
