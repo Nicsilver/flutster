@@ -1,12 +1,42 @@
 import { useEffect, useMemo, useState } from 'react';
-import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, redirectUri, getClientId, setClientId } from './spotify.js';
+import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, redirectUri, getClientId, setClientId, parsePlaylistId } from './spotify.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
 
 const A4_W = 210; // mm — page width drives the auto card size
 
 const pad2 = (y) => String(y % 100).padStart(2, '0');
 
-// Songs-per-year stats used by the summary card (histogram + stat footer).
+// Decade buckets drive all color in the UI: index into DEC_CLASSES/DEC_VARS.
+const DEC_CLASSES = ['dec60', 'dec70', 'dec80', 'dec90', 'dec00', 'dec10'];
+const DEC_VARS = ['--dec60', '--dec70', '--dec80', '--dec90', '--dec00', '--dec10'];
+function decIdx(year) {
+  if (!year) return -1;
+  if (year < 1970) return 0;
+  if (year >= 2010) return 5;
+  return Math.floor((year - 1970) / 10) + 1;
+}
+const decClass = (year) => DEC_CLASSES[decIdx(year)] || '';
+
+// Decade fingerprints (the little era-mix bar under each playlist) need the
+// tracks' years, so they're computed when a playlist is first loaded and cached.
+const FP_KEY = 'flutster_fp';
+function loadFpMap() {
+  try {
+    return JSON.parse(localStorage.getItem(FP_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+function fingerprint(tracks) {
+  const counts = [0, 0, 0, 0, 0, 0];
+  for (const t of tracks) {
+    const i = decIdx(t.year);
+    if (i >= 0) counts[i]++;
+  }
+  return counts;
+}
+
+// Songs-per-year stats used by the timeline strip.
 function yearStats(tracks) {
   const years = tracks.map((t) => t.year).filter((y) => y > 0);
   if (years.length < 2) return { dated: years.length };
@@ -26,6 +56,26 @@ const SHUFFLE_ICON = (
   </svg>
 );
 
+function useTheme() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('flutster_theme') || '');
+  useEffect(() => {
+    if (theme) document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+  }, [theme]);
+  const toggle = () => {
+    const dark = theme
+      ? theme === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const next = dark ? 'light' : 'dark';
+    localStorage.setItem('flutster_theme', next);
+    setTheme(next);
+  };
+  const isDark = theme
+    ? theme === 'dark'
+    : typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return { isDark, toggle };
+}
+
 export default function App() {
   const [clientId, setCid] = useState(getClientId());
   const [token, setToken] = useState(null);
@@ -38,6 +88,8 @@ export default function App() {
   const [myLists, setMyLists] = useState([]);
   const [loadingLists, setLoadingLists] = useState(false);
   const [selectedId, setSelectedId] = useState('');
+  const [fpMap, setFpMap] = useState(loadFpMap);
+  const theme = useTheme();
 
   const [perRow, setPerRow] = useState(3);
   const [cut, setCut] = useState(true);
@@ -47,6 +99,7 @@ export default function App() {
   const [railQuery, setRailQuery] = useState('');
   const [order, setOrder] = useState([]);
   const [excluded, setExcluded] = useState(new Set());
+  const [sheetPage, setSheetPage] = useState(0);
 
   useEffect(() => {
     handleRedirect()
@@ -92,7 +145,7 @@ export default function App() {
   const tracks = capOn ? capPerYear(included, Math.max(1, capN || 1)) : included;
   const finalSet = new Set(tracks.map((t) => t._idx));
   const overCap = included.length - tracks.length;
-  const pages = Math.ceil(tracks.length / grid.perPage);
+  const pages = Math.max(1, Math.ceil(tracks.length / grid.perPage));
   const isLink = /^https?:\/\//i.test(railQuery.trim()) || /spotify:playlist/i.test(railQuery);
   const q = railQuery.trim().toLowerCase();
   const shownLists = !q || isLink ? myLists : myLists.filter((pl) => pl.name.toLowerCase().includes(q));
@@ -107,6 +160,13 @@ export default function App() {
       setPlaylist(data);
       setOrder(data.tracks.map((_, i) => i));
       setExcluded(new Set());
+      setSheetPage(0);
+      const id = parsePlaylistId(link);
+      if (id) {
+        const next = { ...loadFpMap(), [id]: fingerprint(data.tracks) };
+        localStorage.setItem(FP_KEY, JSON.stringify(next));
+        setFpMap(next);
+      }
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
@@ -159,13 +219,26 @@ export default function App() {
     }
   }
 
+  const themeBtn = (
+    <button className="ghost sm" onClick={theme.toggle}>
+      {theme.isDark ? 'Light' : 'Dark'}
+    </button>
+  );
+
   if (!clientId) {
-    return <Shell narrow><SetupClientId onSaved={(id) => { setClientId(id); setCid(id); }} /></Shell>;
+    return (
+      <Shell narrow action={themeBtn}>
+        <SetupClientId onSaved={(id) => { setClientId(id); setCid(id); }} />
+      </Shell>
+    );
   }
 
   if (!token) {
     return (
-      <Shell narrow action={<button className="ghost sm" onClick={() => { setClientId(''); setCid(''); }}>Change ID</button>}>
+      <Shell
+        narrow
+        action={<>{themeBtn}<button className="ghost sm" onClick={() => { setClientId(''); setCid(''); }}>Change ID</button></>}
+      >
         <section className="hero fade-in">
           <span className="pill">Spotify · QR · print at home</span>
           <h2 className="hero-title">Turn a playlist into a card game.</h2>
@@ -188,7 +261,7 @@ export default function App() {
   }
 
   return (
-    <Shell wide action={<button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button>}>
+    <Shell wide action={<>{themeBtn}<button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button></>}>
       <div className="studio fade-in">
         {/* LEFT — playlists */}
         <aside className="st-rail">
@@ -216,13 +289,17 @@ export default function App() {
                 title={pl.name}
               >
                 <div className="st-plc">{pl.image ? <img src={pl.image} alt="" /> : <span>♪</span>}</div>
-                <div className="st-plmeta"><b>{pl.name}</b><span>{pl.count} tracks</span></div>
+                <div className="st-plmeta">
+                  <b>{pl.name}</b>
+                  <Fingerprint counts={fpMap[pl.id]} />
+                  <span>{pl.count} tracks</span>
+                </div>
               </button>
             ))}
           </div>
         </aside>
 
-        {/* MIDDLE — the deck */}
+        {/* MIDDLE — action row, timeline, deck */}
         <main className="st-mid">
           {loading ? (
             <div className="st-empty">Loading playlist…</div>
@@ -233,103 +310,114 @@ export default function App() {
             </div>
           ) : (
             <>
-              <div className="st-midhead">
-                <h2 className="st-plname">{playlist.name}</h2>
-                <div className={'st-cap' + (capOn ? '' : ' off')}>
-                  <label className="toggle st-capsw">
-                    <input type="checkbox" checked={capOn} onChange={(e) => setCapOn(e.target.checked)} />
-                    <span className="track"><span className="thumb" /></span>
-                  </label>
-                  <span className="st-cap-l">Cap per year</span>
-                  <div className="st-stepper">
-                    <button type="button" onClick={() => setCapN((n) => Math.max(1, n - 1))} disabled={!capOn} aria-label="Fewer per year">−</button>
-                    <b>{capN}</b>
-                    <button type="button" onClick={() => setCapN((n) => Math.min(20, n + 1))} disabled={!capOn} aria-label="More per year">+</button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="st-dls">
-                <button className="primary lg" onClick={() => download('fronts')} disabled={!!busy}>
-                  {busy === 'fronts' ? 'Building…' : '⬇  Fronts · QR'}
+              <div className="st-act">
+                <h2>{playlist.name}</h2>
+                <span className="st-actmeta">
+                  {tracks.length} cards · {pages} page{pages !== 1 ? 's' : ''}
+                  {overCap > 0 && <> · {overCap} over cap</>}
+                </span>
+                <span className="grow" />
+                <button className="primary" onClick={() => download('fronts')} disabled={!!busy}>
+                  {busy === 'fronts' ? 'Building…' : 'Fronts · QR'}
                 </button>
-                <button className="primary lg alt" onClick={() => download('backs')} disabled={!!busy}>
-                  {busy === 'backs' ? 'Building…' : '⬇  Backs · answers'}
+                <button className="primary alt" onClick={() => download('backs')} disabled={!!busy}>
+                  {busy === 'backs' ? 'Building…' : 'Backs · answers'}
                 </button>
               </div>
 
-              <SummaryCard tracks={tracks} pages={pages} />
+              <TimelineStrip tracks={tracks} />
 
-              <div className="st-sect">
-                <div className="st-backhead">
-                  <span className="st-caplabel">Card backs</span>
-                  <div className="st-actions">
-                    <button className="st-tbtn" onClick={shuffle}>{SHUFFLE_ICON} Shuffle</button>
-                    {excluded.size > 0 && (
-                      <button className="st-tbtn" onClick={() => setExcluded(new Set())}>Reset</button>
-                    )}
-                  </div>
+              <div className="backs-head">
+                <span className="mini-cap">Card backs</span>
+                <div className="backs-actions">
+                  <button className="st-tbtn" onClick={shuffle}>{SHUFFLE_ICON} Shuffle</button>
+                  {excluded.size > 0 && (
+                    <button className="st-tbtn" onClick={() => setExcluded(new Set())}>Reset</button>
+                  )}
                 </div>
-                <p className="st-pickhint">Tap a card to include or exclude it.</p>
-                <div className="backs-preview">
-                  {ordered.map((t) => {
-                    const state = excluded.has(t._idx) ? 'excluded' : finalSet.has(t._idx) ? 'in' : 'over';
-                    return (
-                      <div className={`pcard ${state}`} key={t._idx} onClick={() => toggleCard(t._idx)} title="Include / exclude">
-                        <span className="yr">{t.year || '—'}</span>
-                        <b>{t.artist}</b>
-                        <i>{t.title}</i>
-                        {state !== 'in' && <span className="cap-tag">{state === 'over' ? 'over cap' : 'off'}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
+              </div>
+              <p className="pick-hint">Tap a card to include or exclude it.</p>
+              <div className="backs-preview">
+                {ordered.map((t) => {
+                  const state = excluded.has(t._idx) ? 'excluded' : finalSet.has(t._idx) ? 'in' : 'over';
+                  return (
+                    <div
+                      className={`pcard ${decClass(t.year)} ${state}`}
+                      key={t._idx}
+                      onClick={() => toggleCard(t._idx)}
+                      title="Include / exclude"
+                    >
+                      <span className="yr">{t.year || '—'}</span>
+                      <b>{t.artist}</b>
+                      <i>{t.title}</i>
+                      {state !== 'in' && <span className="cap-tag">{state === 'over' ? 'over cap' : 'off'}</span>}
+                    </div>
+                  );
+                })}
+              </div>
 
-                <div className="printnote">
-                  <span className="printnote-ic">🖨️</span>
-                  <div>
-                    Print the <b>Fronts</b> PDF, put the stack back in the tray, flip on the{' '}
-                    <b>{flip === 'long' ? 'long edge (left↔right)' : 'short edge (top↕bottom)'}</b>,
-                    then print the <b>Backs</b> PDF. Use <b>100% / actual size</b> (no “fit to page”) and do one test sheet first.
-                  </div>
+              <div className="printnote">
+                <span className="printnote-ic">🖨️</span>
+                <div>
+                  Print the <b>Fronts</b> PDF, put the stack back in the tray, flip on the{' '}
+                  <b>{flip === 'long' ? 'long edge (left↔right)' : 'short edge (top↕bottom)'}</b>,
+                  then print the <b>Backs</b> PDF. Use <b>100% / actual size</b> (no “fit to page”) and do one test sheet first.
                 </div>
               </div>
             </>
           )}
         </main>
 
-        {/* RIGHT — preview + layout */}
+        {/* RIGHT — real sheet preview + layout settings */}
         <aside className="st-rail st-right">
-          <div className="st-rh">Layout &amp; preview</div>
-          <div className="st-a4" style={{ gridTemplateColumns: `repeat(${grid.cols}, 1fr)` }}>
-            {Array.from({ length: grid.cols * grid.rows }).map((_, i) => (
-              <div key={i} className="st-cell" />
-            ))}
-          </div>
+          <div className="st-rh">Print preview</div>
+          <SheetPreview
+            tracks={tracks}
+            grid={grid}
+            page={Math.min(sheetPage, pages - 1)}
+            pages={pages}
+            onPage={setSheetPage}
+            marginMm={marginMm}
+            gapMm={gapMm}
+            cut={cut}
+            hasPlaylist={!!playlist}
+          />
           <div className="st-a4cap">A4 · {grid.cols}×{grid.rows} grid · {cardMm} mm cards</div>
-          <div className="st-setlist">
-            <div className="st-setrow">
-              <span>Cards per row</span>
-              <div className="st-stepper">
-                <button type="button" onClick={() => setPerRow((n) => Math.max(1, n - 1))} disabled={perRow <= 1} aria-label="Fewer per row">−</button>
-                <b>{perRow}</b>
-                <button type="button" onClick={() => setPerRow((n) => Math.min(6, n + 1))} disabled={perRow >= 6} aria-label="More per row">+</button>
-              </div>
+          <div className="st-setrow">
+            <span>Cards per row</span>
+            <div className="st-stepper">
+              <button type="button" onClick={() => setPerRow((n) => Math.max(1, n - 1))} disabled={perRow <= 1} aria-label="Fewer per row">−</button>
+              <b>{perRow}</b>
+              <button type="button" onClick={() => setPerRow((n) => Math.min(6, n + 1))} disabled={perRow >= 6} aria-label="More per row">+</button>
             </div>
-            <div className="st-setrow">
-              <span>Cut guides</span>
+          </div>
+          <div className="st-setrow">
+            <span>Cut guides</span>
+            <label className="toggle">
+              <input type="checkbox" checked={cut} onChange={(e) => setCut(e.target.checked)} />
+              <span className="track"><span className="thumb" /></span>
+            </label>
+          </div>
+          <div className="st-setrow">
+            <span>Flip edge</span>
+            <select className="st-flip" value={flip} onChange={(e) => setFlip(e.target.value)}>
+              <option value="long">Long edge</option>
+              <option value="short">Short edge</option>
+            </select>
+          </div>
+          <div className="st-setrow">
+            <span>Cap per year</span>
+            <span className="pair">
               <label className="toggle">
-                <input type="checkbox" checked={cut} onChange={(e) => setCut(e.target.checked)} />
+                <input type="checkbox" checked={capOn} onChange={(e) => setCapOn(e.target.checked)} />
                 <span className="track"><span className="thumb" /></span>
               </label>
-            </div>
-            <div className="st-setrow">
-              <span>Flip edge</span>
-              <select className="st-flip" value={flip} onChange={(e) => setFlip(e.target.value)}>
-                <option value="long">Long edge</option>
-                <option value="short">Short edge</option>
-              </select>
-            </div>
+              <span className="st-stepper">
+                <button type="button" onClick={() => setCapN((n) => Math.max(1, n - 1))} disabled={!capOn} aria-label="Fewer per year">−</button>
+                <b>{capN}</b>
+                <button type="button" onClick={() => setCapN((n) => Math.min(20, n + 1))} disabled={!capOn} aria-label="More per year">+</button>
+              </span>
+            </span>
           </div>
         </aside>
       </div>
@@ -342,19 +430,100 @@ function Shell({ children, action, narrow, wide }) {
     <div className={'wrap' + (narrow ? ' wrap-narrow' : '') + (wide ? ' wrap-wide' : '')}>
       <header className="topbar">
         <div className="brand">
-          <img className="logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Flutster" width="50" height="50" />
+          <img className="logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Flutster" width="46" height="46" />
           <div className="brand-text">
             <h1>Flutster</h1>
             <span className="tag">Card Maker</span>
           </div>
         </div>
-        {action}
+        <div className="top-actions">{action}</div>
       </header>
       {children}
       <footer>
         Cards encode a <code>spotify:track</code> URI — scan them in Flutster. Personal use.
       </footer>
     </div>
+  );
+}
+
+function Fingerprint({ counts }) {
+  if (!counts) return null;
+  const total = counts.reduce((a, b) => a + b, 0);
+  if (!total) return null;
+  return (
+    <span className="st-fp">
+      {counts.map((c, i) =>
+        c > 0 ? (
+          <span key={i} style={{ width: `${(c / total) * 100}%`, background: `var(${DEC_VARS[i]})` }} />
+        ) : null
+      )}
+    </span>
+  );
+}
+
+function TimelineStrip({ tracks }) {
+  const [hover, setHover] = useState(null);
+  const ys = yearStats(tracks);
+  if (ys.dated < 2) return null;
+  return (
+    <div className="st-tl">
+      <div className="st-tl-head">
+        <b>Timeline</b>
+        <span className={hover ? 'on' : ''}>
+          {hover
+            ? `${hover.y} · ${hover.c} song${hover.c !== 1 ? 's' : ''}`
+            : `${ys.dated} dated · ’${pad2(ys.minY)}–’${pad2(ys.maxY)}`}
+        </span>
+      </div>
+      <div className="st-bars" onMouseLeave={() => setHover(null)}>
+        {ys.counts.map((d) => (
+          <div
+            key={d.y}
+            className={'bar ' + decClass(d.y) + (d.c === 0 ? ' zero' : '')}
+            style={{ height: d.c === 0 ? '3px' : `${Math.max(9, Math.round((d.c / ys.maxC) * 100))}%` }}
+            onMouseEnter={() => setHover(d)}
+            title={`${d.y} · ${d.c} song${d.c !== 1 ? 's' : ''}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist }) {
+  const p = Math.max(0, page);
+  const cells = Array.from({ length: grid.perPage }, (_, i) => tracks[p * grid.perPage + i] || null);
+  const density = grid.cols >= 5 ? ' tiny' : grid.cols === 4 ? ' dense' : '';
+  return (
+    <>
+      <div
+        className={'sheet' + density}
+        style={{
+          padding: `${(marginMm / 210) * 100}%`,
+          gap: `${(gapMm / 210) * 100}%`,
+          gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
+        }}
+      >
+        {cells.map((t, i) => (
+          <div key={i} className={'sheet-cell' + (cut && (t || !hasPlaylist) ? ' cut' : '') + (t ? ' ' + decClass(t.year) : '')}>
+            {t && (
+              <>
+                <span className="yr">{t.year || '—'}</span>
+                <b>{t.artist}</b>
+                <i>{t.title}</i>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      {hasPlaylist && (
+        <div className="sheet-pager">
+          <button className="sheet-arrow" onClick={() => onPage(Math.max(0, p - 1))} disabled={p <= 0} aria-label="Previous sheet">‹</button>
+          Sheet <b>{p + 1}</b> of <b>{pages}</b>
+          <button className="sheet-arrow" onClick={() => onPage(Math.min(pages - 1, p + 1))} disabled={p >= pages - 1} aria-label="Next sheet">›</button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -382,44 +551,6 @@ function CopyCode({ text }) {
       <code>{text}</code>
       <button type="button" className="copybtn" onClick={copy}>{ok ? '✓ Copied' : 'Copy'}</button>
     </span>
-  );
-}
-
-function SummaryCard({ tracks, pages }) {
-  const [hover, setHover] = useState(null);
-  const ys = yearStats(tracks);
-  return (
-    <div className="st-statcard">
-      <div className="st-sc-head">
-        <span className="st-caplabel">Songs per year</span>
-        {ys.dated > 1 && (
-          <span className={'st-scmeta' + (hover ? ' on' : '')}>
-            {hover ? `${hover.y} · ${hover.c} song${hover.c !== 1 ? 's' : ''}` : `${ys.dated} dated`}
-          </span>
-        )}
-      </div>
-      {ys.dated > 1 ? (
-        <div className="st-bars" onMouseLeave={() => setHover(null)}>
-          {ys.counts.map((d) => (
-            <div
-              key={d.y}
-              className={'bar' + (d.c === 0 ? ' zero' : '') + (d.c === ys.maxC ? ' peak' : '')}
-              style={{ height: d.c === 0 ? '3px' : `${Math.max(8, Math.round((d.c / ys.maxC) * 100))}%` }}
-              onMouseEnter={() => setHover(d)}
-              title={`${d.y} · ${d.c} song${d.c !== 1 ? 's' : ''}`}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="hint" style={{ margin: '6px 0 0' }}>Not enough dated tracks to chart.</p>
-      )}
-      <div className="st-scfoot">
-        <div className="st-fstat"><b>{tracks.length}</b><span>Cards</span></div>
-        <div className="st-fstat"><b>{pages}</b><span>Pages</span></div>
-        <div className="st-fstat"><b>{ys.peak ? `’${pad2(ys.minY)}–’${pad2(ys.maxY)}` : '—'}</b><span>Years</span></div>
-        <div className="st-fstat"><b>{ys.peak ? ys.peak.y : '—'}</b><span>Peak</span></div>
-      </div>
-    </div>
   );
 }
 
@@ -453,7 +584,7 @@ function SetupClientId({ onSaved }) {
             onKeyDown={(e) => e.key === 'Enter' && save()}
           />
         </label>
-        <button className="primary lg cid-save" disabled={!v.trim()} onClick={save}>
+        <button className="primary cid-save" disabled={!v.trim()} onClick={save}>
           Save &amp; continue
         </button>
       </div>
@@ -461,4 +592,3 @@ function SetupClientId({ onSaved }) {
     </section>
   );
 }
-

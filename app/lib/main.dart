@@ -27,25 +27,9 @@ class FlutsterApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutster',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        // Berry Punch — mirrors the card-maker web theme.
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB026FF), // violet
-          brightness: Brightness.dark,
-          secondary: const Color(0xFFFF3D81), // pink
-          tertiary: const Color(0xFF5B2BFF), // indigo
-          surface: const Color(0xFF17111F),
-          onSurface: const Color(0xFFFDEEE6),
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0E0A18),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF0E0A18),
-          foregroundColor: Color(0xFFFDEEE6),
-          elevation: 0,
-        ),
-      ),
+      theme: decadesTheme(Brightness.light),
+      darkTheme: decadesTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: AnimatedBuilder(
         animation: Listenable.merge(
             [AppSettings.instance.clientId, AppSettings.instance.explored]),
@@ -59,33 +43,60 @@ class FlutsterApp extends StatelessWidget {
   }
 }
 
-// ── Berry Punch gradient helpers (mirror the card-maker web theme) ──
-const _berryGradient = LinearGradient(
-  colors: [Color(0xFFFF3D81), Color(0xFFB026FF), Color(0xFF5B2BFF)],
-  stops: [0.0, 0.55, 1.0],
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
+// ── Decades theme (mirrors the card-maker web theme: paper/ink + decade hues) ──
+const decadeSpectrum = [
+  Color(0xFFE3A008), // '60s
+  Color(0xFFE8590C), // '70s
+  Color(0xFFD6336C), // '80s
+  Color(0xFF0CA678), // '90s
+  Color(0xFF1C7ED6), // '00s
+  Color(0xFF7048E8), // '10s+
+];
 
-/// Fills [text] with the Berry Punch gradient (like the web wordmark/headings).
-class GradientText extends StatelessWidget {
-  const GradientText(this.text, {super.key, this.style, this.gradient = _berryGradient});
+ThemeData decadesTheme(Brightness b) {
+  final light = b == Brightness.light;
+  final ink = light ? const Color(0xFF26221C) : const Color(0xFFF0EDE6);
+  final bg = light ? const Color(0xFFF7F2E9) : const Color(0xFF15171E);
+  final panel = light ? const Color(0xFFFFFDF8) : const Color(0xFF1D2029);
+  final teal = light ? const Color(0xFF0CA678) : const Color(0xFF22C99B);
+  return ThemeData(
+    useMaterial3: true,
+    brightness: b,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: teal,
+      brightness: b,
+      primary: ink, // ink-on-paper buttons, like the web
+      onPrimary: bg,
+      secondary: teal,
+      surface: panel,
+      onSurface: ink,
+    ),
+    scaffoldBackgroundColor: bg,
+    appBarTheme: AppBarTheme(
+      backgroundColor: bg,
+      foregroundColor: ink,
+      elevation: 0,
+    ),
+  );
+}
+
+/// Brand/headline text; [color] overrides for surfaces like the camera preview.
+class BrandText extends StatelessWidget {
+  const BrandText(this.text, {super.key, this.style, this.color});
   final String text;
   final TextStyle? style;
-  final Gradient gradient;
+  final Color? color;
   @override
   Widget build(BuildContext context) {
-    return ShaderMask(
-      blendMode: BlendMode.srcIn,
-      shaderCallback: (r) => gradient.createShader(Rect.fromLTWH(0, 0, r.width, r.height)),
-      child: Text(text, style: (style ?? const TextStyle()).copyWith(color: Colors.white)),
-    );
+    return Text(text,
+        style: (style ?? const TextStyle())
+            .copyWith(color: color ?? Theme.of(context).colorScheme.onSurface));
   }
 }
 
-/// Gradient-filled primary button (mirrors the web `.primary`).
-class GradientButton extends StatelessWidget {
-  const GradientButton({
+/// Solid ink primary button (mirrors the web `.primary`).
+class PrimaryButton extends StatelessWidget {
+  const PrimaryButton({
     super.key,
     required this.child,
     required this.onPressed,
@@ -96,15 +107,12 @@ class GradientButton extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final enabled = onPressed != null;
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: enabled ? _berryGradient : null,
-        color: enabled ? null : Colors.white10,
+        color: enabled ? scheme.primary : scheme.onSurface.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
-        boxShadow: enabled
-            ? const [BoxShadow(color: Color(0x59B026FF), blurRadius: 22, offset: Offset(0, 8))]
-            : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -116,7 +124,9 @@ class GradientButton extends StatelessWidget {
             child: Center(
               child: DefaultTextStyle.merge(
                 style: TextStyle(
-                    color: enabled ? Colors.white : Colors.white38,
+                    color: enabled
+                        ? scheme.onPrimary
+                        : scheme.onSurface.withValues(alpha: 0.4),
                     fontWeight: FontWeight.bold,
                     fontSize: 16),
                 child: child,
@@ -130,28 +140,32 @@ class GradientButton extends StatelessWidget {
 }
 
 /// Soft corner glows over the plum background (mirrors the web radial glows).
-class BerryBackground extends StatelessWidget {
-  const BerryBackground({super.key, required this.child});
+/// Scaffold background plus the decade spectrum strip along the top edge —
+/// the same brand element as the card-maker web page.
+class DecadesBackground extends StatelessWidget {
+  const DecadesBackground({super.key, required this.child});
   final Widget child;
-  static Widget _glow(Color c, [double size = 400]) => IgnorePointer(
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(colors: [c.withValues(alpha: 0.22), c.withValues(alpha: 0.0)]),
-          ),
-        ),
-      );
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        const Positioned.fill(child: ColoredBox(color: Color(0xFF0E0A18))),
-        Positioned(left: -130, top: -150, child: _glow(const Color(0xFFFF3D81))),
-        Positioned(right: -150, top: -60, child: _glow(const Color(0xFF5B2BFF))),
-        Positioned(left: -80, bottom: -170, child: _glow(const Color(0xFFB026FF), 340)),
+        Positioned.fill(
+            child: ColoredBox(
+                color: Theme.of(context).scaffoldBackgroundColor)),
         Positioned.fill(child: child),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(
+            child: Container(
+              height: 4,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: decadeSpectrum),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -277,7 +291,8 @@ class _ScanHomeState extends State<ScanHome> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const GradientText('Flutster',
+                      const BrandText('Flutster',
+                          color: Colors.white,
                           style: TextStyle(
                               fontSize: 26, fontWeight: FontWeight.bold)),
                       Row(children: [
@@ -477,7 +492,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: BerryBackground(
+        body: DecadesBackground(
           child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -512,14 +527,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 ],
               ),
               const Spacer(),
-              ShaderMask(
-                blendMode: BlendMode.srcIn,
-                shaderCallback: (r) =>
-                    _berryGradient.createShader(Rect.fromLTWH(0, 0, r.width, r.height)),
-                child: const Icon(Icons.music_note, size: 120, color: Colors.white),
-              ),
+              Icon(Icons.music_note,
+                  size: 120, color: Theme.of(context).colorScheme.secondary),
               const SizedBox(height: 28),
-              GradientText('Guess the year',
+              BrandText('Guess the year',
                   style: Theme.of(context)
                       .textTheme
                       .headlineLarge
@@ -564,12 +575,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: GradientButton(
+                child: PrimaryButton(
                   onPressed: _guess,
                   padding: const EdgeInsets.symmetric(vertical: 30),
                   child: const Text('GUESS',
                       style: TextStyle(
-                          fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                          fontSize: 28, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 40),
@@ -689,11 +700,11 @@ class _SettingsHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(6, 22, 6, 8),
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
-            color: Color(0xFFC98CFF)),
+            color: Theme.of(context).colorScheme.secondary),
       ),
     );
   }
@@ -789,7 +800,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final last = _page == _pageCount - 1;
-    return BerryBackground(
+    return DecadesBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -818,7 +829,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: on ? 20 : 7,
                   height: 7,
                   decoration: BoxDecoration(
-                    color: on ? const Color(0xFFB026FF) : Colors.white24,
+                    color: on
+                        ? Theme.of(context).colorScheme.secondary
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.24),
                     borderRadius: BorderRadius.circular(99),
                   ),
                 );
@@ -837,12 +853,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: last
                         ? AnimatedBuilder(
                             animation: _c,
-                            builder: (_, __) => GradientButton(
+                            builder: (_, __) => PrimaryButton(
                               onPressed: _c.text.trim().isEmpty ? null : _save,
                               child: const Text('Save & continue'),
                             ),
                           )
-                        : GradientButton(
+                        : PrimaryButton(
                             onPressed: () => _go(1),
                             child: const Text('Next'),
                           ),
@@ -861,11 +877,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       children: [
         Text(step.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: Color(0xFFC98CFF))),
+                color: Theme.of(context).colorScheme.secondary)),
         const SizedBox(height: 5),
         Text(title,
             style: Theme.of(context)
@@ -885,16 +901,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white70)),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.75))),
           const SizedBox(height: 5),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.only(left: 12, top: 4, bottom: 4, right: 4),
             decoration: BoxDecoration(
-                color: Colors.white10, borderRadius: BorderRadius.circular(10)),
+                color: Theme.of(context).colorScheme.surface,
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.12)),
+                borderRadius: BorderRadius.circular(10)),
             child: Row(
               children: [
                 Expanded(
@@ -904,7 +929,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 IconButton(
                   visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.copy, size: 18, color: Color(0xFFB026FF)),
+                  icon: Icon(Icons.copy,
+                      size: 18, color: Theme.of(context).colorScheme.secondary),
                   onPressed: () => _copy(value),
                 ),
               ],
@@ -951,8 +977,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         padding: const EdgeInsets.only(bottom: 14),
         child: Row(
           children: [
-            const Icon(Icons.check_box_outlined,
-                size: 18, color: Color(0xFFC98CFF)),
+            Icon(Icons.check_box_outlined,
+                size: 18, color: Theme.of(context).colorScheme.secondary),
             const SizedBox(width: 8),
             Expanded(
               child: Text('Under Which API/SDKs, tick Web API and Android.',
@@ -982,8 +1008,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFB026FF).withValues(alpha: 0.10),
-          border: Border.all(color: const Color(0xFFB026FF).withValues(alpha: 0.35)),
+          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.10),
+          border: Border.all(
+              color:
+                  Theme.of(context).colorScheme.secondary.withValues(alpha: 0.35)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Text(
