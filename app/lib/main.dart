@@ -652,6 +652,16 @@ class SettingsScreen extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const DeckSourcesScreen())),
               ),
             ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            ListTile(
+              title: const Text('Card maker'),
+              subtitle: const Text(
+                  'Turn a Spotify playlist into printable cards, in your browser.'),
+              trailing: const Icon(Icons.open_in_new, size: 18),
+              onTap: () => launchUrl(
+                  Uri.parse('https://nicsilver.github.io/flutster/'),
+                  mode: LaunchMode.externalApplication),
+            ),
           ]),
           const _SettingsHeader('About'),
           _SettingsGroup(children: [
