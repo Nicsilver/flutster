@@ -7,6 +7,9 @@ const { Resvg } = require('@resvg/resvg-js');
 
 // ---- Brand palette (mirrors card-maker/src/styles.css, dark-set hues for pop) ----
 const DECS = ['#ffb224', '#ff7043', '#ff5c93', '#22c99b', '#4aa8ff', '#9775fa'];
+// Light-set hues + ink, for the bare mark on paper backgrounds.
+const DECS_LIGHT = ['#e3a008', '#e8590c', '#d6336c', '#0ca678', '#1c7ed6', '#7048e8'];
+const INK_LIGHT = '#26221c';
 const BG = '#15171e';    // ink-blue (web dark --bg)
 const PANEL = '#1d2029'; // web dark --panel
 const INK = '#f0ede6';   // paper (web dark --ink)
@@ -21,7 +24,7 @@ function amp(k, N) {
 
 // Build the waveform + center ring group. Bars sweep the decade hues clockwise
 // from the top; pass barColor to override (monochrome). scale grows from centre.
-function waveGroup({ ringColor, barColor, scale = 1 }) {
+function waveGroup({ ringColor, barColor, scale = 1, palette = DECS }) {
   const N = 40, inner = 88, maxLen = 60, width = 14;
   let bars = '';
   for (let k = 0; k < N; k++) {
@@ -30,7 +33,7 @@ function waveGroup({ ringColor, barColor, scale = 1 }) {
     const r1 = inner, r2 = inner + len;
     const x1 = (CX + r1 * Math.cos(a)).toFixed(2), y1 = (CY + r1 * Math.sin(a)).toFixed(2);
     const x2 = (CX + r2 * Math.cos(a)).toFixed(2), y2 = (CY + r2 * Math.sin(a)).toFixed(2);
-    const color = barColor || DECS[Math.min(DECS.length - 1, Math.floor((k / N) * DECS.length))];
+    const color = barColor || palette[Math.min(palette.length - 1, Math.floor((k / N) * palette.length))];
     bars += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`;
   }
   const ring = `<circle cx="${CX}" cy="${CY}" r="54" fill="none" stroke="${ringColor}" stroke-width="14"/>`;
@@ -67,6 +70,13 @@ function foregroundSVG() {
 function monochromeSVG() {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
     ${waveGroup({ ringColor: '#ffffff', barColor: '#ffffff', scale: 1.18 })}
+  </svg>`;
+}
+
+// --- Bare mark (transparent, no tile): topbar logo on the web app, one per theme ---
+function markSVG({ palette, ringColor }) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    ${waveGroup({ ringColor, palette, scale: 1.6 })}
   </svg>`;
 }
 
@@ -134,6 +144,15 @@ const CM = (p) => path.join(REPO, 'card-maker', p);
   fs.mkdirSync(CM('public'), { recursive: true });
   fs.writeFileSync(CM('public/favicon.svg'), fullIconSVG().trim());
   console.log('  ✓ card-maker/public/favicon.svg');
+  // Bare theme-matched marks for the topbar (no dark tile on the paper theme).
+  fs.writeFileSync(
+    CM('public/mark-light.svg'),
+    markSVG({ palette: DECS_LIGHT, ringColor: INK_LIGHT }).trim());
+  console.log('  ✓ card-maker/public/mark-light.svg');
+  fs.writeFileSync(
+    CM('public/mark-dark.svg'),
+    markSVG({ palette: DECS, ringColor: INK }).trim());
+  console.log('  ✓ card-maker/public/mark-dark.svg');
   write(CM('public/favicon-16x16.png'), renderPng(fullIconSVG(), 16));
   write(CM('public/favicon-32x32.png'), renderPng(fullIconSVG(), 32));
   write(CM('public/apple-touch-icon.png'), renderPng(fullIconSVG(), 180));

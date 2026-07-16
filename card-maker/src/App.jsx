@@ -311,7 +311,7 @@ export default function App() {
 
   if (!clientId) {
     return (
-      <Shell narrow action={themeBtn}>
+      <Shell narrow isDark={theme.isDark} action={themeBtn}>
         <SetupClientId onSaved={(id) => { setClientId(id); setCid(id); }} />
       </Shell>
     );
@@ -321,6 +321,7 @@ export default function App() {
     return (
       <Shell
         narrow
+        isDark={theme.isDark}
         action={<>{themeBtn}<button className="ghost sm" onClick={() => { setClientId(''); setCid(''); }}>Change ID</button></>}
       >
         <section className="hero fade-in">
@@ -345,7 +346,7 @@ export default function App() {
   }
 
   return (
-    <Shell wide action={<>{themeBtn}<button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button></>}>
+    <Shell wide isDark={theme.isDark} action={<>{themeBtn}<button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button></>}>
       <div className="studio fade-in">
         {/* LEFT — playlists */}
         <aside className="st-rail">
@@ -509,12 +510,13 @@ export default function App() {
   );
 }
 
-function Shell({ children, action, narrow, wide }) {
+function Shell({ children, action, narrow, wide, isDark }) {
   return (
     <div className={'wrap' + (narrow ? ' wrap-narrow' : '') + (wide ? ' wrap-wide' : '')}>
       <header className="topbar">
         <div className="brand">
-          <img className="logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Flutster" width="46" height="46" />
+          {/* Bare mark, theme-matched — the tiled icon stays in the favicon. */}
+          <img className="logo" src={`${import.meta.env.BASE_URL}${isDark ? 'mark-dark.svg' : 'mark-light.svg'}`} alt="Flutster" width="46" height="46" />
           <div className="brand-text">
             <h1>Flutster</h1>
             <span className="tag">Card Maker</span>
