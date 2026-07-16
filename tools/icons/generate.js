@@ -16,10 +16,12 @@ const INK = '#f0ede6';   // paper (web dark --ink)
 
 const CX = 256, CY = 256, R = 118;
 
-// music-curve amplitude, exactly as concept 19 "The Original"
+// music-curve amplitude, from concept 19 "The Original". The floor is raised
+// from the original 0.12 so even the short bars reach out — at small sizes the
+// old near-zero bars read as gaps.
 function amp(k, N) {
   let v = 0.5 + 0.35 * Math.sin(k * 1.27) + 0.15 * Math.cos(k * 0.62);
-  return Math.min(1, Math.max(0.12, v));
+  return Math.min(1, Math.max(0.38, v));
 }
 
 // Build the waveform + center ring group. Bars sweep the decade hues clockwise
