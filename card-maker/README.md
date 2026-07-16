@@ -1,22 +1,25 @@
 # Flutster Card Maker
 
 A small web app that turns a **Spotify playlist** into **printable, double-sided
-Flutster cards** — a grid of QR codes on the front (each encoding a
-`spotify:track:` URI) and the year / artist / title on the back, laid out so the
-two sides line up when you flip the paper.
+Flutster cards**. Fronts carry a QR code (a plain `spotify:track:` URI, scanned
+directly by the Flutster app); backs carry the answer — artist, the year on a
+wide colored pill, and the title — between two little equalizer skylines.
 
-The QR codes are plain Spotify track URIs, so the **Flutster** app scans and plays
-them directly (no deck lookup needed).
+Every back gets its own colors, derived from the track itself (never from the
+year, so a glimpsed corner can't spoil the answer). Fronts are identical on
+every card, so nothing is memorizable between game nights. A **Colour / B&W
+ink saver** switch covers laser printers, and the embedded rounded font (Baloo
+2, OFL) travels inside the PDFs, so cards print the same everywhere.
 
 ## One-time setup
 
-1. **Register the redirect URI** in your Spotify dashboard
+1. **Register the redirect URI** in your own Spotify app in the dashboard
    (https://developer.spotify.com/dashboard → your app → *Edit settings* →
    *Redirect URIs*). Add exactly:
    ```
    http://127.0.0.1:5173/
    ```
-   (This is the same Spotify app as Flutster — Client ID `0c33…1e5`.)
+   (or `https://nicsilver.github.io/flutster/` if you use the hosted site).
 2. Make sure **Web API** is ticked under the app's APIs.
 
 ## Run it
@@ -31,11 +34,16 @@ accepts the loopback IP as a redirect).
 
 ## Use it
 
-1. **Log in with Spotify.**
-2. Paste a **playlist link** (e.g. `https://open.spotify.com/playlist/…`) and hit **Load**.
+1. **Log in with Spotify.** Your playlists appear on the left, each with a
+   little decade "fingerprint" showing its era mix; you can also paste any
+   playlist link into the search box.
    - Works with your own playlists and public playlists. (Spotify-owned/algorithmic
      playlists may be blocked by Spotify's API — copy them to your own playlist first.)
-3. Adjust card size / margins if you like. Default is 63 mm (≈ Hitster size), 12 per A4.
+2. Tune the deck: the timeline shows the year balance, tap cards to exclude
+   them, cap songs per year, shuffle. The sheet preview on the right shows the
+   exact printed layout, page by page.
+3. Pick **cards per row** (default 3 → ~63 mm cards, 12 per A4) and **Colour**
+   or **B&W** card style.
 4. **Download the Fronts PDF** and the **Backs PDF**.
 
 ## Printing double-sided (by hand)

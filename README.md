@@ -3,9 +3,9 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/Nicsilver/flutster?label=release&color=b026ff" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-ff3d81" alt="AGPL-3.0 license"></a>
-  <a href="https://nicsilver.github.io/flutster/"><img src="https://img.shields.io/badge/card_maker-live-5b2bff" alt="Card maker"></a>
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/Nicsilver/flutster?label=release&color=e8590c" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-0ca678" alt="AGPL-3.0 license"></a>
+  <a href="https://nicsilver.github.io/flutster/"><img src="https://img.shields.io/badge/card_maker-live-1c7ed6" alt="Card maker"></a>
 </p>
 
 Flutster is a companion app for music-timeline party games. Scan the QR code on a card and the song plays on your own Spotify. Everyone guesses the year it came out, then places it on their timeline.
@@ -31,8 +31,10 @@ Flutster runs on **your own** free Spotify developer credentials, so it works fo
 - Opens straight to the camera. Point at a card and the song plays.
 - Plays through the official Spotify app (Premium required for playback control).
 - Fast-forward, rewind, restart, and an optional "start 30 seconds in" setting that skips long intros.
-- Saves songs you like to a private "Flutster Songs" playlist with one tap.
-- Card Maker turns any playlist into QR fronts and answer backs, aligned for double-sided printing, with a live songs-per-year balance chart.
+- Saves songs you like to a private "Flutster Songs" playlist with one tap; tap again to remove.
+- Card Maker turns any playlist into printable double-sided cards: QR fronts, designed answer backs (each card gets its own colors, hashed from the track so nothing hints at the year), in colour or an ink-saving black and white.
+- A decade-colored timeline and per-playlist "era fingerprints" show a deck's balance before you print; a live sheet preview shows exactly what comes out of the printer.
+- Light and dark themes across app and web.
 - Deck sources: point the app at a deck-database URL or local file to resolve physical cards. You supply the source; the app bundles none.
 
 ## Download
