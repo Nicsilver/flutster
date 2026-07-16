@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, redirectUri, getClientId, setClientId, parsePlaylistId } from './spotify.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
+import { cardColors, rz, INK } from './cardstyle.js';
 
 const A4_W = 210; // mm — page width drives the auto card size
 
@@ -137,6 +138,7 @@ export default function App() {
   const [perRow, setPerRow] = useState(3);
   const [cut, setCut] = useState(true);
   const [flip, setFlip] = useState('long');
+  const [cardStyle, setCardStyle] = useState(() => localStorage.getItem('flutster_cardstyle') || 'color');
   const [capOn, setCapOn] = useState(false);
   const [capN, setCapN] = useState(2);
   const [railQuery, setRailQuery] = useState('');
@@ -193,7 +195,7 @@ export default function App() {
   const gapMm = 2; // auto — fixed gap between cards
   // "Cards per row" is the only size control; the card size (square) is derived to fit A4.
   const cardMm = Math.round(((A4_W - 2 * marginMm - (perRow - 1) * gapMm) / perRow) * 10) / 10;
-  const opts = { cardMm, marginMm, gapMm, cut, flip };
+  const opts = { cardMm, marginMm, gapMm, cut, flip, style: cardStyle };
   const grid = useMemo(() => estimatePerPage(opts), [cardMm, marginMm, gapMm]);
 
   const orderIdx =
@@ -466,6 +468,7 @@ export default function App() {
             gapMm={gapMm}
             cut={cut}
             hasPlaylist={!!playlist}
+            cardStyle={cardStyle}
           />
           <div className="st-a4cap">A4 · {grid.cols}×{grid.rows} grid · {cardMm} mm cards</div>
           <div className="st-setrow">
@@ -488,6 +491,17 @@ export default function App() {
             <select className="st-flip" value={flip} onChange={(e) => setFlip(e.target.value)}>
               <option value="long">Long edge</option>
               <option value="short">Short edge</option>
+            </select>
+          </div>
+          <div className="st-setrow">
+            <span>Card style</span>
+            <select
+              className="st-flip"
+              value={cardStyle}
+              onChange={(e) => { setCardStyle(e.target.value); localStorage.setItem('flutster_cardstyle', e.target.value); }}
+            >
+              <option value="color">Colour</option>
+              <option value="bw">B&W · ink saver</option>
             </select>
           </div>
           <div className="st-setrow">
@@ -594,7 +608,36 @@ function TimelineStrip({ tracks }) {
   );
 }
 
-function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist }) {
+// Mini render of the real card design (155): double skyline, wide year pill.
+function CellBack({ t, cardStyle }) {
+  const { seed, palette } = cardColors(t.uri);
+  const bw = cardStyle === 'bw';
+  const pill = bw ? INK : palette[1];
+  const strip = (edge, s) => (
+    <span className={'cellsky ' + edge}>
+      {Array.from({ length: 9 }, (_, i) => (
+        <i
+          key={i}
+          style={{
+            height: `${rz(s, i, edge === 't' ? 8 : 14, edge === 't' ? 20 : 38)}%`,
+            background: bw ? INK : palette[(s + i) % palette.length],
+          }}
+        />
+      ))}
+    </span>
+  );
+  return (
+    <>
+      {strip('t', seed + 4)}
+      <span className="yr yrpill" style={{ background: pill }}>{t.year || '—'}</span>
+      <b>{t.artist}</b>
+      <i>{t.title}</i>
+      {strip('b', seed)}
+    </>
+  );
+}
+
+function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist, cardStyle }) {
   const p = Math.max(0, page);
   const cells = Array.from({ length: grid.perPage }, (_, i) => tracks[p * grid.perPage + i] || null);
   const density = grid.cols >= 5 ? ' tiny' : grid.cols === 4 ? ' dense' : '';
@@ -609,14 +652,8 @@ function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut,
         }}
       >
         {cells.map((t, i) => (
-          <div key={i} className={'sheet-cell' + (cut && (t || !hasPlaylist) ? ' cut' : '') + (t ? ' ' + decClass(t.year) : '')}>
-            {t && (
-              <>
-                <span className="yr">{t.year || '—'}</span>
-                <b>{t.artist}</b>
-                <i>{t.title}</i>
-              </>
-            )}
+          <div key={i} className={'sheet-cell' + (cut && (t || !hasPlaylist) ? ' cut' : '')}>
+            {t && <CellBack t={t} cardStyle={cardStyle} />}
           </div>
         ))}
       </div>

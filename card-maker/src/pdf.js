@@ -1,7 +1,11 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { BALOO2_BOLD, BALOO2_SEMIBOLD } from './fonts.js';
+import { SPECTRUM, INK, TITLE_INK, cardColors, skyline, FRONT_SEED } from './cardstyle.js';
 
 const A4 = { w: 210, h: 297 }; // mm, portrait
+const MOCK = 176; // the approved mockup's card side; all design values are in mock units
+const PT_PER_MM = 1 / 0.352778;
 
 // Grid geometry for the given card size / margins. Front and back use the SAME
 // geometry so the two printed sides line up.
@@ -18,6 +22,18 @@ function layout({ cardMm, marginMm, gapMm }) {
 function cellXY(col, row, L, { cardMm, gapMm }) {
   return { x: L.offX + col * (cardMm + gapMm), y: L.offY + row * (cardMm + gapMm) };
 }
+
+function newDoc() {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  // Baloo 2 travels inside the PDF — no font needs to exist on the printer side.
+  doc.addFileToVFS('Baloo2-Bold.ttf', BALOO2_BOLD);
+  doc.addFont('Baloo2-Bold.ttf', 'Baloo2', 'bold');
+  doc.addFileToVFS('Baloo2-SemiBold.ttf', BALOO2_SEMIBOLD);
+  doc.addFont('Baloo2-SemiBold.ttf', 'Baloo2', 'semibold');
+  return doc;
+}
+
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 
 // Draw the QR as vector rectangles (tiny file, crisp at any print size) rather
 // than a big raster image. Horizontal runs of dark modules are merged into one
@@ -43,18 +59,44 @@ function drawQr(doc, text, x, y, sizeMm) {
   }
 }
 
-// Shrink text with an ellipsis until it fits maxW (mm). Call after setFontSize.
-function fit(doc, text, maxW) {
-  text = text || '';
-  if (doc.getTextWidth(text) <= maxW) return text;
-  while (text.length > 1 && doc.getTextWidth(text + '…') > maxW) text = text.slice(0, -1);
-  return text + '…';
-}
-
 function drawCut(doc, x, y, cardMm) {
   doc.setDrawColor(205);
   doc.setLineWidth(0.1);
   doc.rect(x, y, cardMm, cardMm);
+}
+
+// The equalizer skyline along a card edge. Round caps make the bars read as
+// the same species as the app's timeline.
+function drawSkyline(doc, x, y, k, seed, palette, edge) {
+  const { bars, w } = skyline(seed, edge);
+  doc.setLineCap('round');
+  doc.setLineWidth(w * k);
+  for (const b of bars) {
+    doc.setDrawColor(...rgb(palette[b.ci % palette.length]));
+    const bx = x + b.x * k;
+    if (edge === 'top') doc.line(bx, y + 6 * k, bx, y + (6 + b.h) * k);
+    else doc.line(bx, y + 170 * k, bx, y + (170 - b.h) * k);
+  }
+}
+
+// Wrap to at most maxLines, shrinking the font until it fits. Returns the
+// lines plus the point size that was settled on.
+function wrapFit(doc, text, basePx, k, maxWmm, maxLines) {
+  text = text || '';
+  let scale = 1;
+  for (;;) {
+    const pt = basePx * k * PT_PER_MM * scale;
+    doc.setFontSize(pt);
+    const lines = doc.splitTextToSize(text, maxWmm);
+    if (lines.length <= maxLines || scale <= 0.55) {
+      if (lines.length > maxLines) {
+        lines.length = maxLines;
+        lines[maxLines - 1] = lines[maxLines - 1].replace(/.{2}$/, '') + '…';
+      }
+      return { lines, pt };
+    }
+    scale *= 0.9;
+  }
 }
 
 export function estimatePerPage(opts) {
@@ -62,10 +104,14 @@ export function estimatePerPage(opts) {
   return { ...L };
 }
 
+// Fronts are pixel-identical on every card (fixed spectrum skyline + QR): the
+// front is face-up while people guess, so it must not be memorizable.
 export async function makeFrontsPdf(tracks, opts) {
-  const { cardMm, cut } = opts;
+  const { cardMm, cut, style = 'color' } = opts;
   const L = layout(opts);
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = newDoc();
+  const k = cardMm / MOCK;
+  const palette = style === 'bw' ? [INK] : SPECTRUM;
   for (let i = 0; i < tracks.length; i++) {
     const slot = i % L.perPage;
     if (i > 0 && slot === 0) doc.addPage();
@@ -73,8 +119,10 @@ export async function makeFrontsPdf(tracks, opts) {
     const row = Math.floor(slot / L.cols);
     const { x, y } = cellXY(col, row, L, opts);
     if (cut) drawCut(doc, x, y, cardMm);
-    const pad = cardMm * 0.1; // white quiet-zone margin inside the card
-    drawQr(doc, tracks[i].uri, x + pad, y + pad, cardMm - 2 * pad);
+    drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'top');
+    drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'bottom');
+    const qs = cardMm * 0.52;
+    drawQr(doc, tracks[i].uri, x + (cardMm - qs) / 2, y + (cardMm - qs) / 2, qs);
   }
   return doc;
 }
@@ -82,10 +130,12 @@ export async function makeFrontsPdf(tracks, opts) {
 // Mirror the back so cards align after flipping the sheet:
 // 'long' flips left/right (mirror columns), 'short' flips top/bottom (mirror rows).
 export async function makeBacksPdf(tracks, opts) {
-  const { cardMm, cut, flip } = opts;
+  const { cardMm, cut, flip, style = 'color' } = opts;
   const L = layout(opts);
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const k = cardMm / 63;
+  const doc = newDoc();
+  const k = cardMm / MOCK;
+  const maxW = cardMm - 32 * k;
+
   for (let i = 0; i < tracks.length; i++) {
     const slot = i % L.perPage;
     if (i > 0 && slot === 0) doc.addPage();
@@ -97,21 +147,55 @@ export async function makeBacksPdf(tracks, opts) {
     if (cut) drawCut(doc, x, y, cardMm);
 
     const t = tracks[i];
+    const { seed, palette: full } = cardColors(t.uri);
+    const palette = style === 'bw' ? [INK] : full;
+    const pillColor = style === 'bw' ? INK : full[1];
+    drawSkyline(doc, x, y, k, seed, palette, 'top');
+    drawSkyline(doc, x, y, k, seed, palette, 'bottom');
+
     const cx = x + cardMm / 2;
-    const maxW = cardMm - 6;
 
-    doc.setTextColor(20);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(40 * k);
-    doc.text(String(t.year || '—'), cx, y + cardMm * 0.5, { align: 'center' });
+    // Measure the stack (artist / wide year pill / title), then center it.
+    doc.setFont('Baloo2', 'bold');
+    const artist = wrapFit(doc, t.artist, 18, k, maxW, 2);
+    doc.setFont('Baloo2', 'semibold');
+    const title = wrapFit(doc, t.title, 12.5, k, maxW, 2);
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11 * k);
-    doc.text(fit(doc, t.artist, maxW), cx, y + cardMm * 0.72, { align: 'center' });
+    const aLH = artist.pt * 0.352778 * 1.08;
+    const tLH = title.pt * 0.352778 * 1.12;
+    const pillH = 32 * k;
+    const gapA = 6 * k;
+    const gapT = 5 * k;
+    const totalH = artist.lines.length * aLH + gapA + pillH + gapT + title.lines.length * tLH;
+    let cursor = y + cardMm / 2 - totalH / 2;
 
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(10 * k);
-    doc.text(fit(doc, t.title, maxW), cx, y + cardMm * 0.85, { align: 'center' });
+    doc.setTextColor(...rgb(INK));
+    doc.setFont('Baloo2', 'bold');
+    doc.setFontSize(artist.pt);
+    for (const line of artist.lines) {
+      doc.text(line, cx, cursor + aLH * 0.8, { align: 'center' });
+      cursor += aLH;
+    }
+    cursor += gapA;
+
+    // The wide banner pill with white numerals.
+    const yearStr = String(t.year || '—');
+    doc.setFontSize(24 * k * PT_PER_MM);
+    const pillW = doc.getTextWidth(yearStr) + 60 * k;
+    doc.setFillColor(...rgb(pillColor));
+    doc.roundedRect(cx - pillW / 2, cursor, pillW, pillH, pillH / 2, pillH / 2, 'F');
+    doc.setTextColor(255, 253, 248);
+    // Baloo's tall ascent: nudge the baseline so digits sit optically centered.
+    doc.text(yearStr, cx, cursor + pillH * 0.73, { align: 'center' });
+    cursor += pillH + gapT;
+
+    doc.setTextColor(...rgb(TITLE_INK));
+    doc.setFont('Baloo2', 'semibold');
+    doc.setFontSize(title.pt);
+    for (const line of title.lines) {
+      doc.text(line, cx, cursor + tLH * 0.8, { align: 'center' });
+      cursor += tLH;
+    }
   }
   return doc;
 }
