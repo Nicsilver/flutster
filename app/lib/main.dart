@@ -585,57 +585,148 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  static String _mask(String id) {
+    final t = id.trim();
+    if (t.length <= 8) return t;
+    return '${t.substring(0, 4)}…${t.substring(t.length - 4)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = AppSettings.instance;
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
         children: [
-          ValueListenableBuilder<bool>(
-            valueListenable: s.start30,
-            builder: (context, value, _) => SwitchListTile(
-              title: const Text('Start songs 30 seconds in'),
-              subtitle: const Text(
-                  'Skip the intro — scanned songs begin 30s into the track.'),
-              value: value,
-              onChanged: (v) => s.setStart30(v),
+          const _SettingsHeader('Playback'),
+          _SettingsGroup(children: [
+            ValueListenableBuilder<bool>(
+              valueListenable: s.start30,
+              builder: (context, value, _) => SwitchListTile(
+                title: const Text('Start songs 30 seconds in'),
+                subtitle: const Text('Skip the quiet intros.'),
+                value: value,
+                onChanged: (v) => s.setStart30(v),
+              ),
             ),
-          ),
-          const Divider(),
-          ListTile(
-            title: const Text('Spotify Client ID'),
-            subtitle: const Text('The Spotify developer app Flutster connects with.'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const OnboardingScreen())),
-          ),
-          const Divider(),
-          ValueListenableBuilder<List<String>>(
-            valueListenable: AppSettings.instance.deckSources,
-            builder: (context, sources, _) => ListTile(
-              title: const Text('Deck sources'),
-              subtitle: Text(sources.isEmpty
-                  ? 'None — scan your own QR cards, or add a deck database'
-                  : '${sources.length} source${sources.length == 1 ? '' : 's'}'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DeckSourcesScreen())),
+          ]),
+          const _SettingsHeader('Spotify'),
+          _SettingsGroup(children: [
+            ValueListenableBuilder<String>(
+              valueListenable: s.clientId,
+              builder: (context, id, _) {
+                final has = id.trim().isNotEmpty;
+                return ListTile(
+                  title: const Text('Client ID'),
+                  subtitle: Text(has
+                      ? _mask(id)
+                      : 'Not set. Connect your own Spotify app.'),
+                  trailing: has
+                      ? const _TagChip('Added')
+                      : const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const OnboardingScreen())),
+                );
+              },
             ),
-          ),
-          const Divider(),
-          const ListTile(
-            title: Text('Liked songs playlist'),
-            subtitle: Text(
-                'The "+" button saves songs to "${SpotifyService.likedPlaylistName}" on your Spotify.'),
-          ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            const ListTile(
+              title: Text('Liked songs playlist'),
+              subtitle: Text(
+                  'The "+" button saves songs to "${SpotifyService.likedPlaylistName}" on your Spotify.'),
+            ),
+          ]),
+          const _SettingsHeader('Decks'),
+          _SettingsGroup(children: [
+            ValueListenableBuilder<List<String>>(
+              valueListenable: s.deckSources,
+              builder: (context, sources, _) => ListTile(
+                title: const Text('Deck sources'),
+                subtitle: Text(sources.isEmpty
+                    ? 'None. Scan your own QR cards, or add a deck database.'
+                    : '${sources.length} source${sources.length == 1 ? '' : 's'}'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DeckSourcesScreen())),
+              ),
+            ),
+          ]),
+          const _SettingsHeader('About'),
+          _SettingsGroup(children: [
+            ListTile(
+              title: const Text('Flutster on GitHub'),
+              subtitle: const Text('Open source, AGPL-3.0 licensed.'),
+              trailing: const Icon(Icons.open_in_new, size: 18),
+              onTap: () => launchUrl(
+                  Uri.parse('https://github.com/Nicsilver/flutster'),
+                  mode: LaunchMode.externalApplication),
+            ),
+          ]),
         ],
       ),
     );
   }
 }
 
+class _SettingsHeader extends StatelessWidget {
+  const _SettingsHeader(this.label);
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 22, 6, 8),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+            color: Color(0xFFC98CFF)),
+      ),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  const _TagChip(this.label);
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF3DBE7A).withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(label,
+          style: const TextStyle(
+              color: Color(0xFF6FDCA4),
+              fontSize: 11,
+              fontWeight: FontWeight.w800)),
+    );
+  }
+}
+
 // One-time setup: the user pastes their own Spotify app's Client ID.
+// A short pager rather than one long list — the middle page batches every value
+// that goes into Spotify's single "Create app" form so it can all be copied in
+// one sitting.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
   @override
@@ -644,6 +735,9 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late final _c = TextEditingController(text: AppSettings.instance.clientId.value);
+  final _pager = PageController();
+  int _page = 0;
+  static const _pageCount = 4;
   static const _pkg = 'com.nicsilver.flutster';
   static const _redirect = 'flutster://auth';
   static const _sha1 = 'C4:9E:41:2D:B4:7E:C7:0A:53:B8:0A:67:97:42:FB:B6:80:28:F1:F6';
@@ -651,6 +745,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void dispose() {
     _c.dispose();
+    _pager.dispose();
     super.dispose();
   }
 
@@ -659,80 +754,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (id.isEmpty) return;
     await AppSettings.instance.setClientId(id);
     if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BerryBackground(
-      child: Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Connect Spotify')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            'Flutster plays music through your own free Spotify developer app, so it '
-            'works for you and your friends. One-time setup, about 3 minutes.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 20),
-          _step(1, 'Log in and press Create app in the Spotify dashboard.',
-              link: 'https://developer.spotify.com/dashboard',
-              linkLabel: 'Open dashboard'),
-          _step(2, 'Redirect URI — add exactly:', copy: _redirect),
-          _step(3, 'Which API/SDKs — tick Web API and Android.'),
-          _step(4, 'Android package name:', copy: _pkg),
-          _step(5, 'Android SHA-1 fingerprint:', copy: _sha1),
-          _step(6, 'Users and Access — add your own Spotify account (needs Premium).'),
-          _step(7, "Open the app's Settings, copy its Client ID, and paste it below."),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _c,
-            decoration: const InputDecoration(
-              labelText: 'Spotify Client ID',
-              border: OutlineInputBorder(),
-            ),
-            onSubmitted: (_) => _save(),
-          ),
-          const SizedBox(height: 16),
-          GradientButton(
-            onPressed: _save,
-            child: const Text('Save & continue'),
-          ),
-          const SizedBox(height: 28),
-          const Divider(),
-          const SizedBox(height: 14),
-          Text('Got physical music cards?',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(
-            "If you own printed music cards (like a music-timeline card game), Flutster "
-            "can play them too — it just needs a deck database that maps each card to a "
-            "track. Search the web for your game's card / gameset database (a public JSON "
-            "file), then add its URL under Deck sources. Optional — without one you can "
-            "still scan cards you make in the card maker.",
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DeckSourcesScreen())),
-            icon: const Icon(Icons.playlist_add),
-            label: const Text('Deck sources (optional)'),
-          ),
-          const SizedBox(height: 28),
-          const Divider(),
-          const SizedBox(height: 6),
-          Center(
-            child: TextButton(
-              onPressed: _skip,
-              child: const Text('Skip for now — explore without Spotify'),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
   }
 
   Future<void> _skip() async {
@@ -750,64 +771,256 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
-  Widget _step(int n, String text, {String? copy, String? link, String? linkLabel}) {
-    const berry = Color(0xFFB026FF);
+  void _go(int delta) {
+    _pager.animateToPage(_page + delta,
+        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final last = _page == _pageCount - 1;
+    return BerryBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('Connect Spotify'),
+          actions: [
+            TextButton(onPressed: _skip, child: const Text('Skip for now')),
+            const SizedBox(width: 6),
+          ],
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: PageView(
+                controller: _pager,
+                onPageChanged: (i) => setState(() => _page = i),
+                children: [_createPage(), _formPage(), _usersPage(), _finishPage()],
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_pageCount, (i) {
+                final on = i == _page;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: on ? 20 : 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: on ? const Color(0xFFB026FF) : Colors.white24,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                );
+              }),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Row(
+                children: [
+                  if (_page > 0) ...[
+                    OutlinedButton(
+                        onPressed: () => _go(-1), child: const Text('Back')),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: last
+                        ? AnimatedBuilder(
+                            animation: _c,
+                            builder: (_, __) => GradientButton(
+                              onPressed: _c.text.trim().isEmpty ? null : _save,
+                              child: const Text('Save & continue'),
+                            ),
+                          )
+                        : GradientButton(
+                            onPressed: () => _go(1),
+                            child: const Text('Next'),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pageShell(String step, String title, List<Widget> children) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+      children: [
+        Text(step.toUpperCase(),
+            style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: Color(0xFFC98CFF))),
+        const SizedBox(height: 5),
+        Text(title,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 14),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _copyField(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 13,
-            backgroundColor: berry,
-            child: Text('$n',
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white70)),
+          const SizedBox(height: 5),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.only(left: 12, top: 4, bottom: 4, right: 4),
+            decoration: BoxDecoration(
+                color: Colors.white10, borderRadius: BorderRadius.circular(10)),
+            child: Row(
               children: [
-                Text(text),
-                if (link != null)
-                  TextButton.icon(
-                    onPressed: () => _open(link),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: const Icon(Icons.open_in_new, size: 16),
-                    label: Text(linkLabel ?? 'Open'),
-                  ),
-                if (copy != null)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(top: 5),
-                    padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4, right: 4),
-                    decoration: BoxDecoration(
-                        color: Colors.white10, borderRadius: BorderRadius.circular(8)),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: SelectableText(copy,
-                              style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
-                        ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.copy, size: 18, color: berry),
-                          onPressed: () => _copy(copy),
-                        ),
-                      ],
-                    ),
-                  ),
+                Expanded(
+                  child: SelectableText(value,
+                      style:
+                          const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.copy, size: 18, color: Color(0xFFB026FF)),
+                  onPressed: () => _copy(value),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _createPage() {
+    return _pageShell('Step 1 of 4', 'Create your Spotify app', [
+      Text(
+        'Flutster plays music through your own free Spotify developer app, so it '
+        'works for you and your friends. One-time setup, about 3 minutes.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      const SizedBox(height: 18),
+      const Text('Log in at the Spotify developer dashboard and press Create app.'),
+      const SizedBox(height: 10),
+      OutlinedButton.icon(
+        onPressed: () => _open('https://developer.spotify.com/dashboard'),
+        icon: const Icon(Icons.open_in_new, size: 16),
+        label: const Text('Open dashboard'),
+      ),
+      const SizedBox(height: 14),
+      Text(
+        'Name and description can be anything. Keep the form open: the next page '
+        'has everything you need to paste into it.',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+    ]);
+  }
+
+  Widget _formPage() {
+    return _pageShell('Step 2 of 4', 'Fill in the app form', [
+      Text(
+        'Everything below goes into the same Create app form. Copy each value across.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      const SizedBox(height: 16),
+      _copyField('Redirect URI', _redirect),
+      Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(
+          children: [
+            const Icon(Icons.check_box_outlined,
+                size: 18, color: Color(0xFFC98CFF)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Under Which API/SDKs, tick Web API and Android.',
+                  style: Theme.of(context).textTheme.bodyMedium),
+            ),
+          ],
+        ),
+      ),
+      _copyField('Android package name', _pkg),
+      _copyField('Android SHA-1 fingerprint', _sha1),
+      Text(
+        'Already created the app without these? Add them under Settings > Edit '
+        'on your app page.',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+    ]);
+  }
+
+  Widget _usersPage() {
+    return _pageShell('Step 3 of 4', 'Add yourself as a user', [
+      Text(
+        'On your new app page, open User Management and add the name and email '
+        'of your own Spotify account.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      const SizedBox(height: 16),
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFB026FF).withValues(alpha: 0.10),
+          border: Border.all(color: const Color(0xFFB026FF).withValues(alpha: 0.35)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+            'The account needs Spotify Premium. Controlling playback is a '
+            'Premium feature.'),
+      ),
+    ]);
+  }
+
+  Widget _finishPage() {
+    return _pageShell('Step 4 of 4', 'Paste your Client ID', [
+      Text(
+        'Copy the Client ID from the top of your app page in the dashboard and '
+        'paste it here.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      const SizedBox(height: 14),
+      TextField(
+        controller: _c,
+        decoration: const InputDecoration(
+          labelText: 'Spotify Client ID',
+          border: OutlineInputBorder(),
+        ),
+        onSubmitted: (_) => _save(),
+      ),
+      const SizedBox(height: 24),
+      const Divider(),
+      const SizedBox(height: 12),
+      Text('Got physical music cards?',
+          style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 6),
+      Text(
+        "If you own printed music cards (like a music-timeline card game), Flutster "
+        "can play them too. It just needs a deck database that maps each card to a "
+        "track: search the web for your game's card or gameset database (a public "
+        "JSON file), then add its URL under Deck sources. Optional, without one you "
+        "can still scan cards you make in the card maker.",
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      const SizedBox(height: 10),
+      OutlinedButton.icon(
+        onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DeckSourcesScreen())),
+        icon: const Icon(Icons.playlist_add),
+        label: const Text('Deck sources (optional)'),
+      ),
+    ]);
   }
 }
 
