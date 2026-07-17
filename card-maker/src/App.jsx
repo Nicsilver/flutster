@@ -54,7 +54,7 @@ const PL_KEY = 'flutster_playlists';
 // Bump when the track tuple shape changes; v2 added the ISRC, which the year
 // verifier needs — serving a pre-v2 entry silently downgrades every track to
 // the slow iTunes fallback.
-const PL_V = 3; // v3 added the compilation flag
+const PL_V = 4; // v4 filtered out ghost tracks (v3 added the compilation flag)
 function loadPlCache() {
   try {
     return JSON.parse(localStorage.getItem(PL_KEY) || '{}');

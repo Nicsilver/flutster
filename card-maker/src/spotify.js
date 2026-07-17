@@ -150,6 +150,12 @@ export async function fetchPlaylist(url, token) {
     for (const it of page.items || []) {
       const t = it.track;
       if (!t || !t.uri || !t.uri.startsWith('spotify:track:')) continue;
+      // Tracks removed from Spotify's catalog stay in playlists as ghosts
+      // with every field blanked — unplayable, unguessable, dead QR.
+      if (!t.name && !(t.artists || []).some((a) => a.name)) {
+        console.warn(`[flutster] skipping ghost track (removed from Spotify): ${t.uri}`);
+        continue;
+      }
       const year = parseInt((t.album?.release_date || '').slice(0, 4), 10) || 0;
       tracks.push({
         uri: t.uri,
