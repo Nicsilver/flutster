@@ -143,7 +143,7 @@ export async function fetchPlaylist(url, token) {
   for (;;) {
     const page = await api(
       `/playlists/${id}/tracks?limit=100&offset=${offset}&fields=${encodeURIComponent(
-        'items(track(uri,id,name,artists(name),album(release_date),external_ids(isrc))),next'
+        'items(track(uri,id,name,artists(name),album(release_date),external_ids)),next'
       )}`,
       token
     );

@@ -51,6 +51,10 @@ function fingerprint(tracks) {
 // The total is a cheap staleness proxy (edits that keep the count slip through
 // until the count next changes — acceptable for a print tool).
 const PL_KEY = 'flutster_playlists';
+// Bump when the track tuple shape changes; v2 added the ISRC, which the year
+// verifier needs — serving a pre-v2 entry silently downgrades every track to
+// the slow iTunes fallback.
+const PL_V = 2;
 function loadPlCache() {
   try {
     return JSON.parse(localStorage.getItem(PL_KEY) || '{}');
@@ -60,7 +64,7 @@ function loadPlCache() {
 }
 function plCacheGet(id, count) {
   const e = loadPlCache()[id];
-  if (!e || count == null || e.count !== count) return null;
+  if (!e || e.v !== PL_V || count == null || e.count !== count) return null;
   return {
     name: e.name,
     tracks: e.tracks.map(([uri, title, artist, year, isrc]) => ({ uri, title, artist, year, isrc: isrc || '' })),
@@ -70,6 +74,7 @@ function plCachePut(id, count, name, tracks) {
   if (count == null) return;
   const cache = loadPlCache();
   cache[id] = {
+    v: PL_V,
     count,
     name,
     ts: Date.now(),

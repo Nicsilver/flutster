@@ -197,11 +197,16 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
     // Pass 1 — MusicBrainz, batched by ISRC.
     const withIsrc = pending.filter((t) => t.isrc);
     let leftovers = pending.filter((t) => !t.isrc);
+    console.debug(
+      `[flutster] year check: ${tracks.length - total} from cache/overrides, ` +
+        `${withIsrc.length} via MusicBrainz (batched), ${leftovers.length} straight to iTunes (no ISRC)`
+    );
     for (let i = 0; i < withIsrc.length; i += MB_BATCH) {
       if (signal?.aborted) return;
       const batch = withIsrc.slice(i, i + MB_BATCH);
       if (i > 0) await sleep(MB_GAP_MS);
       const found = await mbLookup([...new Set(batch.map((t) => t.isrc))], signal);
+      if (!found) console.warn(`[flutster] MusicBrainz batch failed — ${batch.length} tracks fall back to iTunes`);
       for (const t of batch) {
         const y = found?.[t.isrc];
         if (y) {
