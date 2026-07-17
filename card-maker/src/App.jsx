@@ -255,6 +255,16 @@ export default function App() {
   const flagged = playlist
     ? playlist.tracks.filter((t) => (t.unv || t.unsure) && t.ysrc !== 'edit' && acks[t.uri] !== t.year)
     : [];
+  // Reviewing can start while the check is still running: newly flagged
+  // cards append to the open modal (never removed or reordered underfoot).
+  useEffect(() => {
+    if (!reviewOpen) return;
+    setReviewUris((prev) => {
+      const have = new Set(prev);
+      const add = flagged.filter((t) => !have.has(t.uri)).map((t) => t.uri);
+      return add.length ? [...prev, ...add] : prev;
+    });
+  }, [reviewOpen, flagged]);
   // The all-clear strip shows briefly, then gets out of the way.
   useEffect(() => {
     if (verif && !verif.running && flagged.length === 0 && !stripHidden) {
@@ -583,6 +593,11 @@ export default function App() {
                       {verif.total ? `${Math.min(verif.done, verif.total)} / ${verif.total}` : '…'}
                       {verif.eta > 5 && ` · ~${verif.eta >= 90 ? `${Math.ceil(verif.eta / 60)} min` : `${Math.ceil(verif.eta / 10) * 10}s`} left`}
                     </span>
+                    {flagged.length > 0 && (
+                      <button className="primary vreview" onClick={openReview}>
+                        Review {flagged.length} so far
+                      </button>
+                    )}
                   </div>
                   <p className="vhint">
                     Old songs take a while — this runs in the background, so keep arranging your deck.
@@ -729,6 +744,7 @@ export default function App() {
       {reviewOpen && playlist && (
         <ReviewModal
           tracks={reviewUris.map((u) => playlist.tracks.find((t) => t.uri === u)).filter(Boolean)}
+          checking={!!verif?.running}
           acks={acks}
           onEdit={editYear}
           onKeep={(t) => ackTracks([t])}
@@ -898,7 +914,7 @@ function flagReason(t) {
 // Review modal: one row per flagged card — Spotify's claim, our guess with the
 // reason it's flagged, the year that will print (editable), and a Google
 // lookup. Rows stay put as they're resolved so nothing jumps underfoot.
-function ReviewModal({ tracks, acks, onEdit, onKeep, onKeepAll, onClose }) {
+function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onKeepAll, onClose }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -913,8 +929,10 @@ function ReviewModal({ tracks, acks, onEdit, onKeep, onKeepAll, onClose }) {
           <h3>Review years</h3>
           <span className="rvm-sub">
             {open.length === 0
-              ? 'All resolved — this deck is ready to print.'
-              : `${open.length} of ${tracks.length} left`}
+              ? checking
+                ? 'All resolved so far — still checking, more may appear.'
+                : 'All resolved — this deck is ready to print.'
+              : `${open.length} of ${tracks.length} left${checking ? ' · still checking, more may appear' : ''}`}
           </span>
         </div>
         <div className="rvm-body">
