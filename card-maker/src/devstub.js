@@ -12,6 +12,7 @@ const TRACKS = [
   ['spotify:track:stub0000003', 'Never Gonna Give You Up', 'Rick Astley', '2022-03-05', 'GBARL9300135'],
   ['spotify:track:stub0000004', 'Kvinde min', "Gasolin'", '2019-01-01', ''], // no ISRC → iTunes fallback
   ['spotify:track:stub0000005', 'Totally Made Up Song Xyzq', 'The Nonexistents', '1999-01-01', 'ZZXYZ0000001'], // unverifiable
+  ['spotify:track:stub0000006', 'Butcher Pete (Pt. 1)', 'Roy Brown', '2021-01-01', 'QZZZZ2100001'], // pre-digital: ISRC unknown to MB, reissue-junk iTunes dates
 ];
 
 const realFetch = window.fetch.bind(window);

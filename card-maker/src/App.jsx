@@ -254,7 +254,7 @@ export default function App() {
   // claim, ysrc = where the correction came from ('mb'/'it'/'edit'), unv =
   // nothing could confirm it. The earliest plausible year wins — a remaster
   // album on Spotify often already carries the original date.
-  function applyYear(uri, y, src) {
+  function applyYear(uri, y, src, unsure) {
     setPlaylist((p) => {
       if (!p) return p;
       return {
@@ -264,7 +264,14 @@ export default function App() {
           if (src === 'miss') return { ...t, unv: !t.ysrc };
           const y0 = t.year0 ?? t.year;
           const eff = src === 'edit' ? y : plausibleYear(y0) && y0 < y ? y0 : y;
-          return { ...t, year: eff, year0: y0, ysrc: eff !== y0 || src === 'edit' ? src : '', unv: false };
+          return {
+            ...t,
+            year: eff,
+            year0: y0,
+            ysrc: eff !== y0 || src === 'edit' ? src : '',
+            unv: false,
+            unsure: src === 'edit' ? false : !!unsure,
+          };
         }),
       };
     });
@@ -283,14 +290,14 @@ export default function App() {
       onProgress: (done, total) => {
         if (run === verifRun.current) setVerif((v) => ({ ...v, done, total }));
       },
-      onUpdate: (uri, y, src) => {
+      onUpdate: (uri, y, src, unsure) => {
         if (run !== verifRun.current) return;
-        if (src === 'mb' || src === 'it') {
+        if (src !== 'edit' && src !== 'miss') {
           const sy = spotifyYear.get(uri) || 0;
           const eff = plausibleYear(sy) && sy < y ? sy : y;
           if (eff !== sy) fixed++;
         }
-        applyYear(uri, y, src);
+        applyYear(uri, y, src, unsure);
       },
     })
       .catch(() => {})
@@ -719,16 +726,20 @@ function YearTag({ t, onEdit }) {
     );
   }
   const corrected = t.ysrc && t.ysrc !== 'edit' && t.year0 > 0 && t.year0 !== t.year;
-  const title = corrected
-    ? `Spotify said ${t.year0} — corrected via ${t.ysrc === 'mb' ? 'MusicBrainz' : 'iTunes'}. Click to edit.`
-    : t.ysrc === 'edit'
-    ? 'Edited by you — click to change.'
-    : t.unv
-    ? 'Could not verify this year — click to edit.'
-    : 'Click to edit the year.';
+  const srcName = { mb: 'MusicBrainz', it: 'iTunes', dg: 'Discogs' }[t.ysrc] || t.ysrc;
+  const title =
+    t.ysrc === 'edit'
+      ? 'Edited by you — click to change.'
+      : corrected
+      ? `Spotify said ${t.year0} — corrected via ${srcName}${t.unsure ? ' (uncertain: sources disagree)' : ''}. Click to edit.`
+      : t.unv
+      ? 'Could not verify this year — click to edit.'
+      : t.unsure
+      ? 'Uncertain — sources disagree on this year. Click to edit.'
+      : 'Click to edit the year.';
   return (
     <span
-      className={'yr' + (corrected ? ' yr-fix' : '') + (t.ysrc === 'edit' ? ' yr-edited' : '') + (t.unv ? ' yr-unv' : '')}
+      className={'yr' + (corrected ? ' yr-fix' : '') + (t.ysrc === 'edit' ? ' yr-edited' : '') + (t.unv || t.unsure ? ' yr-unv' : '')}
       title={title}
       onClick={(e) => {
         e.stopPropagation();
