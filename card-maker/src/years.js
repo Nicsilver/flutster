@@ -13,6 +13,7 @@ const FIX_KEY = 'flutster_yearfix'; // { [track uri]: year } manual overrides
 const MB_BATCH = 15;
 const MB_GAP_MS = 1100; // MusicBrainz allows ~1 request/second
 const IT_GAP_MS = 3500; // iTunes tolerates ~20 requests/minute
+const MB_RETRY_COOLDOWN_MS = 8000; // pause before re-sweeping rate-limited batches
 const MISS_TTL_MS = 30 * 24 * 3600 * 1000; // re-try known misses monthly
 const CACHE_MAX = 6000;
 
@@ -70,7 +71,9 @@ async function mbLookup(isrcs, signal) {
       return null;
     }
     if (resp.status === 503) {
-      await sleep(3000 * (attempt + 1));
+      // Retry-After is only readable if CORS exposes it; fall back to backoff.
+      const ra = parseInt(resp.headers.get('retry-after') || '', 10) * 1000;
+      await sleep(Math.min(ra > 0 ? ra : 3000 * (attempt + 1), 15000));
       continue;
     }
     if (!resp.ok) return null;
@@ -201,23 +204,48 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
       `[flutster] year check: ${tracks.length - total} from cache/overrides, ` +
         `${withIsrc.length} via MusicBrainz (batched), ${leftovers.length} straight to iTunes (no ISRC)`
     );
-    for (let i = 0; i < withIsrc.length; i += MB_BATCH) {
-      if (signal?.aborted) return;
-      const batch = withIsrc.slice(i, i + MB_BATCH);
-      if (i > 0) await sleep(MB_GAP_MS);
-      const found = await mbLookup([...new Set(batch.map((t) => t.isrc))], signal);
-      if (!found) console.warn(`[flutster] MusicBrainz batch failed — ${batch.length} tracks fall back to iTunes`);
-      for (const t of batch) {
-        const y = found?.[t.isrc];
-        if (y) {
-          cachePut(cache, t.isrc, { y, s: 'mb', t: Date.now() });
-          emit(t, y, 'mb');
-          tick(1);
-        } else {
-          leftovers.push(t); // MB miss (or failed batch) — try iTunes
+    // Sweeps `list` through batched MB lookups. Definitive misses (MB answered
+    // but doesn't know the recording) join `leftovers` for iTunes; tracks from
+    // FAILED requests (rate limit, network) are returned for a later retry —
+    // they must not burn the slow iTunes budget while MB is merely grumpy.
+    const mbSweep = async (list) => {
+      const failed = [];
+      for (let i = 0; i < list.length; i += MB_BATCH) {
+        if (signal?.aborted) return failed;
+        const batch = list.slice(i, i + MB_BATCH);
+        if (i > 0) await sleep(MB_GAP_MS);
+        const found = await mbLookup([...new Set(batch.map((t) => t.isrc))], signal);
+        if (!found) {
+          failed.push(...batch);
+          continue;
+        }
+        for (const t of batch) {
+          const y = found[t.isrc];
+          if (y) {
+            cachePut(cache, t.isrc, { y, s: 'mb', t: Date.now() });
+            emit(t, y, 'mb');
+            tick(1);
+          } else {
+            leftovers.push(t);
+          }
         }
       }
+      return failed;
+    };
+
+    let failed = await mbSweep(withIsrc);
+    if (failed.length && !signal?.aborted) {
+      console.warn(
+        `[flutster] MusicBrainz requests failed for ${failed.length} tracks — retrying in ${MB_RETRY_COOLDOWN_MS / 1000}s`
+      );
+      await sleep(MB_RETRY_COOLDOWN_MS);
+      failed = await mbSweep(failed);
+      if (failed.length) {
+        console.warn(`[flutster] MusicBrainz still unavailable — ${failed.length} tracks fall back to iTunes`);
+        leftovers.push(...failed);
+      }
     }
+    if (signal?.aborted) return;
 
     // Pass 2 — iTunes for the stragglers, gently.
     const home = itunesCountry();
