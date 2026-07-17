@@ -10,7 +10,7 @@
 
 // Bump the key suffix when verdict logic changes materially — old entries are
 // verdicts from the old logic and must not survive an upgrade.
-const CACHE_KEY = 'flutster_years2'; // { [isrc|uri]: { y, s: 'mb'|'it'|'dg', u?, t } } — y:0 = known miss
+const CACHE_KEY = 'flutster_years3'; // { [isrc|uri]: { y, s: 'mb'|'it'|'dg', u?, t } } — y:0 = known miss
 const FIX_KEY = 'flutster_yearfix'; // { [track uri]: year } manual overrides
 const MB_BATCH = 15;
 const MB_GAP_MS = 1100; // MusicBrainz allows ~1 request/second
@@ -119,6 +119,15 @@ const baseTitle = (s) => norm(String(s || '').replace(/\s*[([].*?[)\]]/g, '').sp
 // "Pt1" / "Pt. 1" / "Part One" suffixes vary per catalog and never change the
 // year — drop them so the same song matches across sources.
 const canonTitle = (s) => baseTitle(s).replace(/\b(?:pt|part)\s*(?:one|two|three|\d+)$/, '').trim();
+// "Kay Kyser & His Orchestra" / "Frankie Carle with Marjorie Hughes" →
+// "Kay Kyser" / "Frankie Carle": big-band credits vary per catalog and break
+// artist filters. Deliberately narrow — "Ike & Tina Turner" must survive.
+const leadArtist = (s) =>
+  String(s || '')
+    .split(',')[0]
+    .replace(/\s+(?:&|and)\s+(?:his|her|the)\s.*$/i, '')
+    .replace(/\s+(?:with|feat\.?|featuring)\s.*$/i, '')
+    .trim();
 
 function itunesCountry() {
   const m = String(globalThis.navigator?.language || '').match(/-([A-Za-z]{2})\b/);
@@ -133,7 +142,7 @@ function itunesCountry() {
 // clear majority within a narrow spread counts as trustworthy on its own.
 // Returns { y, conf } (y 0 = genuine miss) or null when the request failed.
 async function itunesLookup(track, country, signal) {
-  const artist = String(track.artist || '').split(',')[0].trim();
+  const artist = leadArtist(track.artist);
   const title = String(track.title || '').split(' - ')[0].trim();
   const url =
     `https://itunes.apple.com/search?media=music&entity=song&limit=25&country=${country}` +
@@ -185,7 +194,7 @@ async function itunesLookup(track, country, signal) {
 // anything). Earliest matching year; exact-artist + canonical-title filtering
 // keeps covers and homonyms out. Returns year, 0 = miss, null = failed.
 async function mbTitleLookup(track, signal) {
-  const artistTok = norm(String(track.artist || '').split(',')[0]);
+  const artistTok = norm(leadArtist(track.artist));
   const titleTok = canonTitle(track.title);
   if (!artistTok || !titleTok) return 0;
   // norm() output is alphanumeric+spaces, so the tokens are Lucene-safe.
@@ -230,7 +239,7 @@ async function discogsLookup(track, signal) {
   // NO apostrophes: "I Don't Want to Set the World on Fire" finds a 1959
   // compilation while "I Dont Want..." finds the 1941 original 78.
   const deApos = (s) => s.replace(/['’´`]/g, '');
-  const artist = deApos(String(track.artist || '').split(',')[0]).trim();
+  const artist = deApos(leadArtist(track.artist)).trim();
   const title = deApos(
     String(track.title || '')
       .replace(/\s*[([].*?[)\]]/g, '')
