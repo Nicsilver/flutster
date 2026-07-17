@@ -7,12 +7,13 @@
 // Spotify years below are deliberately wrong in the ways real metadata is
 // wrong: remaster date, compilation date, re-release date.
 const TRACKS = [
-  ['spotify:track:stub0000001', 'Bohemian Rhapsody - Remastered 2011', 'Queen', '2011-01-01', 'GBUM71029604'],
-  ['spotify:track:stub0000002', 'Billie Jean', 'Michael Jackson', '2005-06-01', 'USSM19902991'],
-  ['spotify:track:stub0000003', 'Never Gonna Give You Up', 'Rick Astley', '2022-03-05', 'GBARL9300135'],
-  ['spotify:track:stub0000004', 'Kvinde min', "Gasolin'", '2019-01-01', ''], // no ISRC → iTunes fallback
-  ['spotify:track:stub0000005', 'Totally Made Up Song Xyzq', 'The Nonexistents', '1999-01-01', 'ZZXYZ0000001'], // unverifiable
-  ['spotify:track:stub0000006', 'Butcher Pete (Pt. 1)', 'Roy Brown', '2021-01-01', 'QZZZZ2100001'], // pre-digital: ISRC unknown to MB, reissue-junk iTunes dates
+  ['spotify:track:stub0000001', 'Bohemian Rhapsody - Remastered 2011', 'Queen', '2011-01-01', 'GBUM71029604', 'album'],
+  ['spotify:track:stub0000002', 'Billie Jean', 'Michael Jackson', '2005-06-01', 'USSM19902991', 'compilation'],
+  ['spotify:track:stub0000003', 'Never Gonna Give You Up', 'Rick Astley', '2022-03-05', 'GBARL9300135', 'compilation'],
+  ['spotify:track:stub0000004', 'Kvinde min', "Gasolin'", '2019-01-01', '', 'compilation'], // no ISRC
+  ['spotify:track:stub0000005', 'Totally Made Up Song Xyzq', 'The Nonexistents', '1999-01-01', 'ZZXYZ0000001', 'album'], // unverifiable
+  ['spotify:track:stub0000006', 'Butcher Pete (Pt. 1)', 'Roy Brown', '2021-01-01', 'QZZZZ2100001', 'compilation'], // pre-digital: ISRC unknown to MB
+  ["spotify:track:stub0000007", "Ain't That A Kick In The Head", 'Dean Martin', '2002-01-01', '', 'compilation'], // apostrophe + comp-date case
 ];
 
 const realFetch = window.fetch.bind(window);
@@ -32,13 +33,13 @@ window.fetch = (input, init) => {
   }
   if (u.includes('api.spotify.com/v1/playlists/stubpl/tracks')) {
     return json({
-      items: TRACKS.map(([uri, name, artist, date, isrc]) => ({
+      items: TRACKS.map(([uri, name, artist, date, isrc, albumType]) => ({
         track: {
           uri,
           id: uri.split(':')[2],
           name,
           artists: [{ name: artist }],
-          album: { release_date: date },
+          album: { release_date: date, album_type: albumType },
           external_ids: { isrc },
         },
       })),

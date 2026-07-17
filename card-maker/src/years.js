@@ -8,7 +8,9 @@
 //      matching is fuzzy, so it only runs when there's no exact ISRC hit.
 // Verdicts are cached in localStorage so each track costs the network once.
 
-const CACHE_KEY = 'flutster_years'; // { [isrc|uri]: { y, s: 'mb'|'it', t } } — y:0 = known miss
+// Bump the key suffix when verdict logic changes materially — old entries are
+// verdicts from the old logic and must not survive an upgrade.
+const CACHE_KEY = 'flutster_years2'; // { [isrc|uri]: { y, s: 'mb'|'it'|'dg', u?, t } } — y:0 = known miss
 const FIX_KEY = 'flutster_yearfix'; // { [track uri]: year } manual overrides
 const MB_BATCH = 15;
 const MB_GAP_MS = 1100; // MusicBrainz allows ~1 request/second
@@ -223,14 +225,18 @@ async function mbTitleLookup(track, signal) {
 // credited to the artist is the earliest documented appearance of the song.
 // Returns year, 0 = miss, null = failed.
 async function discogsLookup(track, signal) {
-  const artist = String(track.artist || '').split(',')[0].trim();
   // Discogs matches tracklist titles fairly literally — query with the bare
-  // song name (no parentheticals, no "- Remastered", no Part-N suffix).
-  const title = String(track.title || '')
-    .replace(/\s*[([].*?[)\]]/g, '')
-    .split(' - ')[0]
-    .replace(/\b(?:pt|part)\.?\s*(?:one|two|three|\d+)\s*$/i, '')
-    .trim();
+  // song name (no parentheticals, no "- Remastered", no Part-N suffix), and
+  // NO apostrophes: "I Don't Want to Set the World on Fire" finds a 1959
+  // compilation while "I Dont Want..." finds the 1941 original 78.
+  const deApos = (s) => s.replace(/['’´`]/g, '');
+  const artist = deApos(String(track.artist || '').split(',')[0]).trim();
+  const title = deApos(
+    String(track.title || '')
+      .replace(/\s*[([].*?[)\]]/g, '')
+      .split(' - ')[0]
+      .replace(/\b(?:pt|part)\.?\s*(?:one|two|three|\d+)\s*$/i, '')
+  ).trim();
   if (!artist || !title) return 0;
   const url =
     'https://api.discogs.com/database/search?per_page=25&sort=year&sort_order=asc' +
@@ -305,18 +311,18 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
   onProgress?.(0, total);
 
   try {
-    // Pass 1 — MusicBrainz, batched by ISRC.
+    // Pass 1 — MusicBrainz, batched by ISRC. An ISRC hit alone is NOT a
+    // verdict: MB recording entries created from reissues carry the reissue's
+    // date. It only stands when it independently agrees with Spotify's year
+    // AND the track isn't from a compilation (a comp date "agreeing" with an
+    // MB entry sourced from the same comp is one wrong source, twice).
+    // Everything else goes to the corroboration lane with the MB year as one
+    // candidate among several.
     const withIsrc = pending.filter((t) => t.isrc);
-    let leftovers = pending.filter((t) => !t.isrc);
-    console.debug(
-      `[flutster] year check: ${tracks.length - total} from cache/overrides, ` +
-        `${withIsrc.length} via MusicBrainz (batched), ${leftovers.length} straight to iTunes (no ISRC)`
-    );
-    // Sweeps `list` through batched MB lookups. Definitive misses (MB answered
-    // but doesn't know the recording) join `leftovers` for iTunes; tracks from
-    // FAILED requests (rate limit, network) are returned for a later retry —
-    // they must not burn the slow iTunes budget while MB is merely grumpy.
+    const lane = pending.filter((t) => !t.isrc).map((t) => ({ t, isrcY: 0 }));
     const mbSweep = async (list) => {
+      // Tracks from FAILED requests (rate limit, network) are returned for a
+      // later retry; definitive misses join the lane immediately.
       const failed = [];
       for (let i = 0; i < list.length; i += MB_BATCH) {
         if (signal?.aborted) return failed;
@@ -328,12 +334,13 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
         }
         for (const t of batch) {
           const y = found[t.isrc];
-          if (y) {
+          const sy = t.year || 0;
+          if (y && !t.comp && Math.abs(y - sy) <= 2) {
             cachePut(cache, t.isrc, { y, s: 'mb', t: Date.now() });
             emit(t, y, 'mb');
             tick(1);
           } else {
-            leftovers.push(t);
+            lane.push({ t, isrcY: y || 0 });
           }
         }
       }
@@ -348,47 +355,63 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
       await sleep(MB_RETRY_COOLDOWN_MS);
       failed = await mbSweep(failed);
       if (failed.length) {
-        console.warn(`[flutster] MusicBrainz still unavailable — ${failed.length} tracks fall back to iTunes`);
-        leftovers.push(...failed);
+        console.warn(`[flutster] MusicBrainz still unavailable for ${failed.length} tracks`);
+        lane.push(...failed.map((t) => ({ t, isrcY: 0 })));
       }
     }
     if (signal?.aborted) return;
+    console.debug(
+      `[flutster] year check: ${tracks.length - total} cached, ${done} confirmed by MusicBrainz+Spotify agreement, ` +
+        `${lane.length} need corroboration (Discogs + iTunes)`
+    );
 
-    // Pass 2 — the slow lane. Each straggler gets up to three opinions:
-    // MusicBrainz by title, iTunes (confidence-gated vote), and Discogs as
-    // tiebreaker when the first two disagree or can't stand alone. The
-    // EARLIEST year across trusted answers wins; a verdict no second source
-    // corroborates is still applied but flagged for a human glance.
+    // Pass 2 — the corroboration lane. Discogs (physical-release authority)
+    // and iTunes (confidence-gated vote) run in parallel per track, with the
+    // MB ISRC year as a third candidate; MB title search is a last resort
+    // when nothing corroborates. EARLIEST trusted year wins. Flag `unsure`
+    // when no second source lands within 3 years of the verdict, and when
+    // Spotify's own year is earlier than everything the sources found (the
+    // min-rule will keep it, but nothing supports it).
     const home = itunesCountry();
-    for (const t of leftovers) {
+    for (const { t, isrcY } of lane) {
       if (signal?.aborted) return;
-      const a = await mbTitleLookup(t, signal);
-      let it = await itunesLookup(t, home, signal);
-      if (it && !it.y && home !== 'us') it = (await itunesLookup(t, 'us', signal)) ?? it;
-      const A = a || 0;
-      const B = it?.y || 0;
+      const itChain = async () => {
+        let r = await itunesLookup(t, home, signal);
+        if (r && !r.y && home !== 'us') r = (await itunesLookup(t, 'us', signal)) ?? r;
+        return r;
+      };
+      const [dg, it] = await Promise.all([discogsLookup(t, signal), itChain()]);
+      const cand = [
+        { y: isrcY, s: 'mb', trusted: true },
+        { y: dg || 0, s: 'dg', trusted: true },
+        { y: it?.y || 0, s: 'it', trusted: !!it?.conf },
+      ].filter((c) => c.y);
+      const near = (y) => cand.filter((c) => Math.abs(c.y - y) <= 3).length;
+      let trusted = cand.filter((c) => c.trusted);
+      let vY = trusted.length ? Math.min(...trusted.map((c) => c.y)) : 0;
+      if (!vY || near(vY) < 2) {
+        const mt = await mbTitleLookup(t, signal);
+        if (mt) {
+          cand.push({ y: mt, s: 'mb', trusted: true });
+          trusted = cand.filter((c) => c.trusted);
+          vY = Math.min(...trusted.map((c) => c.y));
+        }
+      }
       let verdict = 0;
       let src = '';
       let unsure = false;
-      let c; // stays undefined when Discogs wasn't needed
-      if (A && B && Math.abs(A - B) <= 3) {
-        verdict = Math.min(A, B);
-        src = verdict === A ? 'mb' : 'it';
-      } else {
-        c = await discogsLookup(t, signal);
-        const C = c || 0;
-        const pool = [A, it?.conf ? B : 0, C].filter(Boolean);
-        if (pool.length) {
-          verdict = Math.min(...pool);
-          src = verdict === C ? 'dg' : verdict === A ? 'mb' : 'it';
-          unsure = [A, B, C].filter((y) => y && Math.abs(y - verdict) <= 3).length < 2;
-        } else if (B) {
-          verdict = B; // scattered, uncorroborated vote — best guess, flagged
-          src = 'it';
-          unsure = true;
-        }
+      if (vY) {
+        verdict = vY;
+        src = trusted.find((c) => c.y === vY).s;
+        unsure = near(vY) < 2;
+      } else if (it?.y) {
+        verdict = it.y; // scattered, uncorroborated vote — best guess, flagged
+        src = 'it';
+        unsure = true;
       }
-      const answered = a !== null || it !== null || (c !== undefined && c !== null);
+      const sy = t.year || 0;
+      if (verdict && plausibleYear(sy) && sy < verdict - 2) unsure = true;
+      const answered = isrcY > 0 || dg !== null || it !== null;
       if (!answered) {
         emit(t, 0, 'miss'); // every request failed — report but don't cache
       } else {

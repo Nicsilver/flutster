@@ -54,7 +54,7 @@ const PL_KEY = 'flutster_playlists';
 // Bump when the track tuple shape changes; v2 added the ISRC, which the year
 // verifier needs — serving a pre-v2 entry silently downgrades every track to
 // the slow iTunes fallback.
-const PL_V = 2;
+const PL_V = 3; // v3 added the compilation flag
 function loadPlCache() {
   try {
     return JSON.parse(localStorage.getItem(PL_KEY) || '{}');
@@ -67,7 +67,7 @@ function plCacheGet(id, count) {
   if (!e || e.v !== PL_V || count == null || e.count !== count) return null;
   return {
     name: e.name,
-    tracks: e.tracks.map(([uri, title, artist, year, isrc]) => ({ uri, title, artist, year, isrc: isrc || '' })),
+    tracks: e.tracks.map(([uri, title, artist, year, isrc, comp]) => ({ uri, title, artist, year, isrc: isrc || '', comp: !!comp })),
   };
 }
 function plCachePut(id, count, name, tracks) {
@@ -80,7 +80,7 @@ function plCachePut(id, count, name, tracks) {
     ts: Date.now(),
     // Cached years are Spotify's own (year0 when verification already ran) —
     // corrections re-apply from the flutster_years cache on every load.
-    tracks: tracks.map((t) => [t.uri, t.title, t.artist, t.year0 ?? t.year, t.isrc || '']),
+    tracks: tracks.map((t) => [t.uri, t.title, t.artist, t.year0 ?? t.year, t.isrc || '', t.comp ? 1 : 0]),
   };
   const ids = Object.keys(cache);
   if (ids.length > 40) {

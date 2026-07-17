@@ -143,7 +143,7 @@ export async function fetchPlaylist(url, token) {
   for (;;) {
     const page = await api(
       `/playlists/${id}/tracks?limit=100&offset=${offset}&fields=${encodeURIComponent(
-        'items(track(uri,id,name,artists(name),album(release_date),external_ids)),next'
+        'items(track(uri,id,name,artists(name),album(release_date,album_type),external_ids)),next'
       )}`,
       token
     );
@@ -158,6 +158,9 @@ export async function fetchPlaylist(url, token) {
         artist: (t.artists || []).map((a) => a.name).join(', '),
         year,
         isrc: t.external_ids?.isrc || '',
+        // Compilation dates are the main source of wrong years — the verifier
+        // refuses to fast-path tracks that come from one.
+        comp: t.album?.album_type === 'compilation',
       });
     }
     if (!page.next) break;
