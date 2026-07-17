@@ -916,11 +916,44 @@ function googleUrl(t) {
   return 'https://www.google.com/search?q=' + encodeURIComponent(`${artist} ${title} release year`);
 }
 
-function flagReason(t) {
-  if (t.unv) return ['bad', 'not found anywhere'];
-  if (!t.ysrc) return ['warn', "Spotify's year unsupported"];
+// One written line of context per flagged song — reads like a person, not a
+// spreadsheet.
+function rowSentence(t) {
+  const y0 = t.year0 ?? t.year;
+  if (t.ysrc === 'edit') {
+    return (
+      <>
+        You set <b>{t.year}</b>
+      </>
+    );
+  }
+  if (t.unv) {
+    return (
+      <>
+        Not found anywhere — Spotify's <b>{y0 || '—'}</b> stays unless you fix it
+      </>
+    );
+  }
+  if (!t.ysrc) {
+    return (
+      <>
+        Nothing backs Spotify's <b>{t.year}</b> — sources point later
+      </>
+    );
+  }
   const src = SRC_NAMES[t.ysrc] || t.ysrc;
-  return ['warn', t.ysrc === 'it' ? `${src} · low confidence` : `${src} · single source`];
+  if (t.ysrc === 'it') {
+    return (
+      <>
+        Spotify says <s>{y0}</s> · iTunes guesses <b>{t.year}</b>, low confidence
+      </>
+    );
+  }
+  return (
+    <>
+      Spotify says <s>{y0}</s> · only {src} disagrees with <b>{t.year}</b>
+    </>
+  );
 }
 
 // Review modal: one row per flagged card — Spotify's claim, our guess with the
@@ -937,6 +970,7 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
   return (
     <div className="rvm-back" onClick={onClose} role="dialog" aria-modal="true" aria-label="Review years">
       <div className="rvm" onClick={(e) => e.stopPropagation()}>
+        <div className="rvm-strip" aria-hidden="true" />
         <div className="rvm-head">
           <h3>Review years</h3>
           <span className="rvm-sub">
@@ -948,66 +982,50 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
           </span>
         </div>
         <div className="rvm-body">
-          <table className="rvt">
-            <thead>
-              <tr>
-                <th>Song</th>
-                <th>Spotify</th>
-                <th>Our guess</th>
-                <th>On the card</th>
-                <th aria-hidden="true" />
-                <th className="rv-okh">Correct?</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tracks.map((t) => {
-                const [cls, why] = flagReason(t);
-                const done = resolved(t);
-                return (
-                  <tr key={t.uri} className={done ? 'done' : ''}>
-                    <td className="rv-song">
-                      <b>{t.title}</b>
-                      <span>{t.artist}</span>
-                    </td>
-                    <td className="rv-sp">{t.year0 ?? t.year ?? '—'}</td>
-                    <td>
-                      {done ? (
-                        <span className="rchip good">✓ {t.year || '—'}</span>
-                      ) : (
-                        <span className={`rchip ${cls}`}>{t.unv ? why : `${t.year} · ${why}`}</span>
-                      )}
-                    </td>
-                    <td>
-                      <RowYear t={t} onEdit={onEdit} onKeep={onKeep} done={done} />
-                    </td>
-                    <td>
-                      <a className="rv-look" href={googleUrl(t)} target="_blank" rel="noreferrer">
-                        Look up ↗
-                      </a>
-                    </td>
-                    <td className="rv-okc">
-                      <button
-                        className={'rv-ok' + (done ? ' on' : '')}
-                        title={
-                          t.ysrc === 'edit'
-                            ? 'Resolved by your edit'
-                            : done
-                            ? 'Marked correct — click to unmark'
-                            : 'Mark this year as correct'
-                        }
-                        aria-label={`Mark year for ${t.title} as correct`}
-                        aria-pressed={done}
-                        disabled={t.ysrc === 'edit'}
-                        onClick={() => (done ? onUnkeep(t) : onKeep(t))}
-                      >
-                        ✓
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {tracks.map((t) => {
+            const done = resolved(t);
+            return (
+              <div key={t.uri} className={'rvr' + (done ? ' done' : '')}>
+                <div className="rvr-main">
+                  <div className="rvr-t">
+                    {t.title} <span className="rvr-a">· {t.artist}</span>
+                  </div>
+                  <div className="rvr-s">
+                    {rowSentence(t)}
+                    {t.ysrc !== 'edit' && (
+                      <>
+                        {' · '}
+                        <a className="rv-look" href={googleUrl(t)} target="_blank" rel="noreferrer">
+                          look it up ↗
+                        </a>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {done ? (
+                  <span className="rvr-kept">{t.year || '—'}</span>
+                ) : (
+                  <RowYear t={t} onEdit={onEdit} onKeep={onKeep} done={done} />
+                )}
+                <button
+                  className={'rv-ok' + (done ? ' on' : '')}
+                  title={
+                    t.ysrc === 'edit'
+                      ? 'Resolved by your edit'
+                      : done
+                      ? 'Marked correct — click to unmark'
+                      : 'Mark this year as correct'
+                  }
+                  aria-label={`Mark year for ${t.title} as correct`}
+                  aria-pressed={done}
+                  disabled={t.ysrc === 'edit'}
+                  onClick={() => (done ? onUnkeep(t) : onKeep(t))}
+                >
+                  ✓
+                </button>
+              </div>
+            );
+          })}
         </div>
         <div className="rvm-foot">
           <span className="rvm-sub">

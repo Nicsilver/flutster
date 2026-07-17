@@ -343,40 +343,32 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 }
 .rvm {
   background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
-  box-shadow: var(--sheet-shadow); width: min(780px, 100%); max-height: min(84vh, 700px);
-  display: flex; flex-direction: column;
+  box-shadow: var(--sheet-shadow); width: min(680px, 100%); max-height: min(84vh, 700px);
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.rvm-head { display: flex; align-items: baseline; gap: 12px; padding: 16px 20px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.rvm-head h3 { margin: 0; font-size: 16px; }
+/* Proof-sheet look: spectrum strip on top, dashed rules and dashed inputs
+   echoing the print preview's cut guides. */
+.rvm-strip { height: 4px; background: var(--spectrum); flex: none; }
+.rvm-head { display: flex; align-items: baseline; gap: 12px; padding: 14px 24px 11px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.rvm-head h3 { margin: 0; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; }
 .rvm-sub { font-size: 12.5px; color: var(--muted); }
-.rvm-body { padding: 2px 20px; overflow: auto; }
-.rvt { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 560px; }
-.rvt th {
-  text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
-  color: var(--muted); font-weight: 800; padding: 8px 8px 6px; border-bottom: 1px solid var(--line);
-  position: sticky; top: 0; background: var(--panel);
-}
-.rvt td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-.rvt tr:last-child td { border-bottom: 0; }
-.rvt tr.done { opacity: 0.62; }
-.rv-song b { display: block; font-size: 13px; font-weight: 700; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rv-song span { color: var(--muted); font-size: 12px; display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rv-sp { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
-.rchip {
-  display: inline-block; font-size: 10.5px; font-weight: 800; border-radius: 6px;
-  padding: 2px 7px; letter-spacing: 0.02em; white-space: nowrap;
-}
-.rchip.warn { background: color-mix(in srgb, var(--dec70) 14%, transparent); color: var(--dec70); }
-.rchip.bad { background: color-mix(in srgb, var(--dec80) 14%, transparent); color: var(--dec80); }
-.rchip.good { background: color-mix(in srgb, var(--dec90) 14%, transparent); color: var(--dec90); }
+.rvm-body { padding: 2px 24px; overflow: auto; }
+.rvr { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+.rvr:last-child { border-bottom: 0; }
+.rvr.done { opacity: 0.55; }
+.rvr-main { flex: 1; min-width: 0; }
+.rvr-t { font-weight: 700; font-size: 13.5px; }
+.rvr-a { color: var(--muted); font-weight: 400; font-size: 12.5px; }
+.rvr-s { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.rvr-s b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.rvr-s s { text-decoration-thickness: 1.5px; }
+.rvr-kept { flex: none; width: 60px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
 .rv-in {
-  width: 60px; text-align: center; font: inherit; font-weight: 800; font-variant-numeric: tabular-nums;
-  padding: 5px 2px; border: 1.5px solid var(--dec70); border-radius: 8px;
+  flex: none; width: 60px; text-align: center; font: inherit; font-weight: 800; font-variant-numeric: tabular-nums;
+  padding: 5px 2px; border: 1.5px dashed var(--line); border-radius: 8px;
   background: var(--field); color: var(--ink);
 }
-.rv-in.ok { border-color: var(--line); }
-.rv-in:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
-.rv-okh, .rv-okc { text-align: center !important; }
+.rv-in:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; border-style: solid; }
 .rv-ok {
   width: 28px; height: 28px; border-radius: 50%; padding: 0; cursor: pointer;
   border: 1.5px solid var(--line); background: transparent; color: var(--muted);
