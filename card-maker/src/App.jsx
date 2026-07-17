@@ -319,8 +319,8 @@ export default function App() {
     setVerif({ running: true, done: 0, total: 0, fixed: 0 });
     verifyYears(data.tracks, {
       signal: ctrl.signal,
-      onProgress: (done, total) => {
-        if (run === verifRun.current) setVerif((v) => ({ ...v, done, total }));
+      onProgress: (done, total, eta) => {
+        if (run === verifRun.current) setVerif((v) => ({ ...v, done, total, eta }));
       },
       onUpdate: (uri, y, src, unsure) => {
         if (run !== verifRun.current) return;
@@ -581,6 +581,7 @@ export default function App() {
                     </span>
                     <span className="vcount">
                       {verif.total ? `${Math.min(verif.done, verif.total)} / ${verif.total}` : '…'}
+                      {verif.eta > 5 && ` · ~${verif.eta >= 90 ? `${Math.ceil(verif.eta / 60)} min` : `${Math.ceil(verif.eta / 10) * 10}s`} left`}
                     </span>
                   </div>
                   <p className="vhint">

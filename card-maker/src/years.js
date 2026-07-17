@@ -312,12 +312,22 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
 
   const total = pending.length;
   let done = 0;
+  // Live remaining-time estimate: during the batch phase every unresolved
+  // track is pessimistically priced as a lane track (the estimate can only
+  // shrink); once the lane is known it's exact.
+  const LANE_S = 3.6;
+  const BATCH_S = 1.3;
+  let batchesLeft = 0;
+  let inLanePhase = false;
+  const eta = () => {
+    const unresolved = total - done;
+    return Math.round(unresolved * LANE_S + (inLanePhase ? 0 : batchesLeft * BATCH_S));
+  };
   const tick = (n) => {
     done += n;
-    onProgress?.(done, total);
+    onProgress?.(done, total, eta());
   };
   if (total === 0) return;
-  onProgress?.(0, total);
 
   try {
     // Pass 1 — MusicBrainz, batched by ISRC. An ISRC hit alone is NOT a
@@ -329,6 +339,8 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
     // candidate among several.
     const withIsrc = pending.filter((t) => t.isrc);
     const lane = pending.filter((t) => !t.isrc).map((t) => ({ t, isrcY: 0 }));
+    batchesLeft = Math.ceil(withIsrc.length / MB_BATCH);
+    onProgress?.(0, total, eta());
     const mbSweep = async (list) => {
       // Tracks from FAILED requests (rate limit, network) are returned for a
       // later retry; definitive misses join the lane immediately.
@@ -337,6 +349,7 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
         if (signal?.aborted) return failed;
         const batch = list.slice(i, i + MB_BATCH);
         const found = await mbLookup([...new Set(batch.map((t) => t.isrc))], signal);
+        batchesLeft = Math.max(0, batchesLeft - 1);
         if (!found) {
           failed.push(...batch);
           continue;
@@ -358,6 +371,7 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
 
     let failed = await mbSweep(withIsrc);
     if (failed.length && !signal?.aborted) {
+      batchesLeft = Math.ceil(failed.length / MB_BATCH);
       console.warn(
         `[flutster] MusicBrainz requests failed for ${failed.length} tracks — retrying in ${MB_RETRY_COOLDOWN_MS / 1000}s`
       );
@@ -381,6 +395,8 @@ export async function verifyYears(tracks, { onUpdate, onProgress, signal } = {})
     // when no second source lands within 3 years of the verdict, and when
     // Spotify's own year is earlier than everything the sources found (the
     // min-rule will keep it, but nothing supports it).
+    inLanePhase = true;
+    onProgress?.(done, total, eta());
     const home = itunesCountry();
     for (const { t, isrcY } of lane) {
       if (signal?.aborted) return;
