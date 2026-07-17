@@ -368,6 +368,17 @@ export default function App() {
     });
   }
 
+  function unackTrack(t) {
+    setAcks((prev) => {
+      const next = { ...prev };
+      delete next[t.uri];
+      try {
+        localStorage.setItem(ACK_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }
+
   function openReview() {
     setPrintPop(false);
     setReviewUris(flagged.map((t) => t.uri));
@@ -748,6 +759,7 @@ export default function App() {
           acks={acks}
           onEdit={editYear}
           onKeep={(t) => ackTracks([t])}
+          onUnkeep={unackTrack}
           onKeepAll={(list) => ackTracks(list)}
           onClose={() => setReviewOpen(false)}
         />
@@ -914,7 +926,7 @@ function flagReason(t) {
 // Review modal: one row per flagged card — Spotify's claim, our guess with the
 // reason it's flagged, the year that will print (editable), and a Google
 // lookup. Rows stay put as they're resolved so nothing jumps underfoot.
-function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onKeepAll, onClose }) {
+function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepAll, onClose }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -944,6 +956,7 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onKeepAll, onClos
                 <th>Our guess</th>
                 <th>On the card</th>
                 <th aria-hidden="true" />
+                <th className="rv-okh">Correct?</th>
               </tr>
             </thead>
             <tbody>
@@ -972,6 +985,24 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onKeepAll, onClos
                         Look up ↗
                       </a>
                     </td>
+                    <td className="rv-okc">
+                      <button
+                        className={'rv-ok' + (done ? ' on' : '')}
+                        title={
+                          t.ysrc === 'edit'
+                            ? 'Resolved by your edit'
+                            : done
+                            ? 'Marked correct — click to unmark'
+                            : 'Mark this year as correct'
+                        }
+                        aria-label={`Mark year for ${t.title} as correct`}
+                        aria-pressed={done}
+                        disabled={t.ysrc === 'edit'}
+                        onClick={() => (done ? onUnkeep(t) : onKeep(t))}
+                      >
+                        ✓
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -979,15 +1010,17 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onKeepAll, onClos
           </table>
         </div>
         <div className="rvm-foot">
-          <span className="rvm-sub">Type a year and press Enter. Enter on an unchanged year keeps our guess.</span>
+          <span className="rvm-sub">
+            {tracks.length - open.length} of {tracks.length} checked
+          </span>
           <span className="grow" />
           {open.length > 0 && (
             <button className="ghost sm" onClick={() => onKeepAll(open)}>
-              Keep all guesses
+              Mark all correct
             </button>
           )}
           <button className="primary sm-cta" onClick={onClose}>
-            Done
+            Close
           </button>
         </div>
       </div>
