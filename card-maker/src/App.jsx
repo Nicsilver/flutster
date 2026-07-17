@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, redirectUri, getClientId, setClientId, parsePlaylistId } from './spotify.js';
 import { verifyYears, saveOverride, plausibleYear } from './years.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
@@ -967,6 +967,34 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
   }, [onClose]);
   const resolved = (t) => t.ysrc === 'edit' || acks[t.uri] === t.year || !(t.unv || t.unsure);
   const open = tracks.filter((t) => !resolved(t));
+  // Resolved rows sink below the open ones (stable within each group), with a
+  // FLIP slide so the reorder reads as movement, not a teleport.
+  const ordered = [...tracks].sort((a, b) => (resolved(a) ? 1 : 0) - (resolved(b) ? 1 : 0));
+  const bodyRef = useRef(null);
+  const rowTops = useRef(new Map());
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const next = new Map();
+    for (const el of body.children) {
+      if (!el.dataset.uri) continue;
+      next.set(el.dataset.uri, el.getBoundingClientRect().top);
+    }
+    if (!reduce) {
+      for (const el of body.children) {
+        const prev = rowTops.current.get(el.dataset.uri);
+        const now = next.get(el.dataset.uri);
+        if (prev != null && now != null && Math.abs(prev - now) > 1) {
+          el.animate(
+            [{ transform: `translateY(${prev - now}px)` }, { transform: 'translateY(0)' }],
+            { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+          );
+        }
+      }
+    }
+    rowTops.current = next;
+  });
   return (
     <div className="rvm-back" onClick={onClose} role="dialog" aria-modal="true" aria-label="Review years">
       <div className="rvm" onClick={(e) => e.stopPropagation()}>
@@ -981,11 +1009,11 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
               : `${open.length} of ${tracks.length} left${checking ? ' · still checking, more may appear' : ''}`}
           </span>
         </div>
-        <div className="rvm-body">
-          {tracks.map((t) => {
+        <div className="rvm-body" ref={bodyRef}>
+          {ordered.map((t) => {
             const done = resolved(t);
             return (
-              <div key={t.uri} className={'rvr' + (done ? ' done' : '')}>
+              <div key={t.uri} data-uri={t.uri} className={'rvr' + (done ? ' done' : '')}>
                 <div className="rvr-main">
                   <div className="rvr-t">
                     {t.title} <span className="rvr-a">· {t.artist}</span>
