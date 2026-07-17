@@ -94,6 +94,18 @@ function plCachePut(id, count, name, tracks) {
   }
 }
 
+// "Keep this guess" acknowledgements from the review modal, keyed by track
+// uri → the year that was acknowledged. Only honored while the verdict still
+// matches — a changed verdict re-flags the card.
+const ACK_KEY = 'flutster_yearok';
+function loadAcks() {
+  try {
+    return JSON.parse(localStorage.getItem(ACK_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
 // Songs-per-year stats used by the timeline strip.
 function yearStats(tracks) {
   const years = tracks.map((t) => t.year).filter((y) => y > 0);
@@ -142,6 +154,11 @@ export default function App() {
   const [selectedId, setSelectedId] = useState('');
   const [fpMap, setFpMap] = useState(loadFpMap);
   const [verif, setVerif] = useState(null);
+  const [acks, setAcks] = useState(loadAcks);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewUris, setReviewUris] = useState([]);
+  const [printPop, setPrintPop] = useState(false);
+  const [stripHidden, setStripHidden] = useState(false);
   const verifRun = useRef(0);
   const verifCtrl = useRef(null);
   const playlistRef = useRef(null);
@@ -233,6 +250,18 @@ export default function App() {
     });
   const included = ordered.filter((t) => !excluded.has(t._idx));
   const tracks = capOn ? capPerYear(included, Math.max(1, capN || 1)) : included;
+  // Cards whose year still needs a human: uncertain or unfound, not manually
+  // edited, and not acknowledged in the review modal.
+  const flagged = playlist
+    ? playlist.tracks.filter((t) => (t.unv || t.unsure) && t.ysrc !== 'edit' && acks[t.uri] !== t.year)
+    : [];
+  // The all-clear strip shows briefly, then gets out of the way.
+  useEffect(() => {
+    if (verif && !verif.running && flagged.length === 0 && !stripHidden) {
+      const id = setTimeout(() => setStripHidden(true), 4000);
+      return () => clearTimeout(id);
+    }
+  }, [verif, flagged.length, stripHidden]);
   const finalSet = new Set(tracks.map((t) => t._idx));
   const overCap = included.length - tracks.length;
   const pages = Math.max(1, Math.ceil(tracks.length / grid.perPage));
@@ -279,6 +308,9 @@ export default function App() {
 
   function startVerify(data, id, count) {
     const run = ++verifRun.current;
+    setStripHidden(false);
+    setReviewOpen(false);
+    setPrintPop(false);
     verifCtrl.current?.abort();
     const ctrl = new AbortController();
     verifCtrl.current = ctrl;
@@ -313,6 +345,23 @@ export default function App() {
   function editYear(uri, y) {
     saveOverride(uri, y);
     applyYear(uri, y, 'edit');
+  }
+
+  function ackTracks(list) {
+    setAcks((prev) => {
+      const next = { ...prev };
+      for (const t of list) next[t.uri] = t.year;
+      try {
+        localStorage.setItem(ACK_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }
+
+  function openReview() {
+    setPrintPop(false);
+    setReviewUris(flagged.map((t) => t.uri));
+    setReviewOpen(true);
   }
 
   async function onLoad(link = url) {
@@ -483,23 +532,90 @@ export default function App() {
                 <span className="st-actmeta">
                   {tracks.length} cards · {pages} page{pages !== 1 ? 's' : ''}
                   {overCap > 0 && <> · {overCap} over cap</>}
-                  {verif?.running && (
-                    <span className="st-verif">
-                      {' '}· checking years{verif.total > 0 ? ` ${Math.min(verif.done, verif.total)}/${verif.total}` : '…'}
-                    </span>
-                  )}
-                  {verif && !verif.running && verif.fixed > 0 && (
-                    <span className="st-verif done"> · {verif.fixed} year{verif.fixed !== 1 ? 's' : ''} corrected</span>
-                  )}
                 </span>
                 <span className="grow" />
                 <button className="primary" onClick={() => download('fronts')} disabled={!!busy}>
                   {busy === 'fronts' ? 'Building…' : 'Fronts · QR'}
                 </button>
-                <button className="primary alt" onClick={() => download('backs')} disabled={!!busy}>
-                  {busy === 'backs' ? 'Building…' : 'Backs · answers'}
-                </button>
+                <span className="printwrap">
+                  <button
+                    className="primary alt"
+                    disabled={!!busy}
+                    onClick={() => {
+                      if (printPop) return setPrintPop(false);
+                      if (flagged.length > 0) return setPrintPop(true);
+                      download('backs');
+                    }}
+                  >
+                    {busy === 'backs' ? 'Building…' : 'Backs · answers'}
+                    {flagged.length > 0 && <span className="flagbadge">{flagged.length}</span>}
+                  </button>
+                  {printPop && (
+                    <div className="printpop">
+                      <b>{flagged.length} year{flagged.length !== 1 ? 's' : ''} still flagged</b>
+                      <p>These cards would print with unconfirmed years.</p>
+                      <div className="printpop-row">
+                        <button className="primary sm-cta" onClick={openReview}>Review first</button>
+                        <button
+                          className="ghost sm"
+                          onClick={() => {
+                            setPrintPop(false);
+                            download('backs');
+                          }}
+                        >
+                          Print anyway
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </span>
               </div>
+
+              {verif && verif.running && (
+                <div className="vstrip">
+                  <div className="vrow">
+                    <span className="vspin" aria-hidden="true" />
+                    <span className="vtitle">Checking years…</span>
+                    <span className="vbar">
+                      <i style={{ width: verif.total ? `${Math.round((Math.min(verif.done, verif.total) / verif.total) * 100)}%` : '10%' }} />
+                    </span>
+                    <span className="vcount">
+                      {verif.total ? `${Math.min(verif.done, verif.total)} / ${verif.total}` : '…'}
+                    </span>
+                  </div>
+                  <p className="vhint">
+                    Old songs take a while — this runs in the background, so keep arranging your deck.
+                    Already-checked songs are instant next time.
+                  </p>
+                </div>
+              )}
+              {verif && !verif.running && flagged.length > 0 && (
+                <div className="vstrip warn">
+                  <div className="vrow">
+                    <span className="vtitle">
+                      Years checked — <b className="vwarn">{flagged.length} need your eyes</b>
+                    </span>
+                    <span className="vhint inline">
+                      {verif.fixed > 0 && <>{verif.fixed} corrected · </>}
+                      {flagged.length} uncertain or unfound
+                    </span>
+                    <span className="grow" />
+                    <button className="primary vreview" onClick={openReview}>
+                      Review {flagged.length} flagged
+                    </button>
+                  </div>
+                </div>
+              )}
+              {verif && !verif.running && flagged.length === 0 && !stripHidden && (
+                <div className="vstrip ok">
+                  <div className="vrow">
+                    <span className="vtitle vok">
+                      ✓ {playlist.tracks.length} years checked
+                      {verif.fixed > 0 && <> · {verif.fixed} corrected</>}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <TimelineStrip tracks={tracks} />
 
@@ -609,6 +725,16 @@ export default function App() {
           </div>
         </aside>
       </div>
+      {reviewOpen && playlist && (
+        <ReviewModal
+          tracks={reviewUris.map((u) => playlist.tracks.find((t) => t.uri === u)).filter(Boolean)}
+          acks={acks}
+          onEdit={editYear}
+          onKeep={(t) => ackTracks([t])}
+          onKeepAll={(list) => ackTracks(list)}
+          onClose={() => setReviewOpen(false)}
+        />
+      )}
     </Shell>
   );
 }
@@ -750,6 +876,130 @@ function YearTag({ t, onEdit }) {
       {t.year || '—'}
       {corrected && <s>{t.year0}</s>}
     </span>
+  );
+}
+
+const SRC_NAMES = { mb: 'MusicBrainz', it: 'iTunes', dg: 'Discogs' };
+
+function googleUrl(t) {
+  const title = String(t.title || '').split(' - ')[0].trim();
+  const artist = String(t.artist || '').split(',')[0].trim();
+  return 'https://www.google.com/search?q=' + encodeURIComponent(`${artist} ${title} release year`);
+}
+
+function flagReason(t) {
+  if (t.unv) return ['bad', 'not found anywhere'];
+  if (!t.ysrc) return ['warn', "Spotify's year unsupported"];
+  const src = SRC_NAMES[t.ysrc] || t.ysrc;
+  return ['warn', t.ysrc === 'it' ? `${src} · low confidence` : `${src} · single source`];
+}
+
+// Review modal: one row per flagged card — Spotify's claim, our guess with the
+// reason it's flagged, the year that will print (editable), and a Google
+// lookup. Rows stay put as they're resolved so nothing jumps underfoot.
+function ReviewModal({ tracks, acks, onEdit, onKeep, onKeepAll, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const resolved = (t) => t.ysrc === 'edit' || acks[t.uri] === t.year || !(t.unv || t.unsure);
+  const open = tracks.filter((t) => !resolved(t));
+  return (
+    <div className="rvm-back" onClick={onClose} role="dialog" aria-modal="true" aria-label="Review years">
+      <div className="rvm" onClick={(e) => e.stopPropagation()}>
+        <div className="rvm-head">
+          <h3>Review years</h3>
+          <span className="rvm-sub">
+            {open.length === 0
+              ? 'All resolved — this deck is ready to print.'
+              : `${open.length} of ${tracks.length} left`}
+          </span>
+        </div>
+        <div className="rvm-body">
+          <table className="rvt">
+            <thead>
+              <tr>
+                <th>Song</th>
+                <th>Spotify</th>
+                <th>Our guess</th>
+                <th>On the card</th>
+                <th aria-hidden="true" />
+              </tr>
+            </thead>
+            <tbody>
+              {tracks.map((t) => {
+                const [cls, why] = flagReason(t);
+                const done = resolved(t);
+                return (
+                  <tr key={t.uri} className={done ? 'done' : ''}>
+                    <td className="rv-song">
+                      <b>{t.title}</b>
+                      <span>{t.artist}</span>
+                    </td>
+                    <td className="rv-sp">{t.year0 ?? t.year ?? '—'}</td>
+                    <td>
+                      {done ? (
+                        <span className="rchip good">✓ {t.year || '—'}</span>
+                      ) : (
+                        <span className={`rchip ${cls}`}>{t.unv ? why : `${t.year} · ${why}`}</span>
+                      )}
+                    </td>
+                    <td>
+                      <RowYear t={t} onEdit={onEdit} onKeep={onKeep} done={done} />
+                    </td>
+                    <td>
+                      <a className="rv-look" href={googleUrl(t)} target="_blank" rel="noreferrer">
+                        Look up ↗
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="rvm-foot">
+          <span className="rvm-sub">Type a year and press Enter. Enter on an unchanged year keeps our guess.</span>
+          <span className="grow" />
+          {open.length > 0 && (
+            <button className="ghost sm" onClick={() => onKeepAll(open)}>
+              Keep all guesses
+            </button>
+          )}
+          <button className="primary sm-cta" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RowYear({ t, onEdit, onKeep, done }) {
+  const [v, setV] = useState(String(t.year || ''));
+  useEffect(() => setV(String(t.year || '')), [t.year]);
+  // Blur only saves a CHANGED year — tabbing through rows must not silently
+  // acknowledge every guess. Enter also confirms an unchanged one.
+  const commit = (confirmKeep) => {
+    const y = parseInt(v, 10);
+    if (!plausibleYear(y)) return setV(String(t.year || ''));
+    if (y !== t.year) onEdit(t.uri, y);
+    else if (confirmKeep && !done) onKeep(t);
+  };
+  return (
+    <input
+      className={'rv-in' + (done ? ' ok' : '')}
+      value={v}
+      inputMode="numeric"
+      maxLength={4}
+      aria-label={`Year for ${t.title}`}
+      onChange={(e) => setV(e.target.value.replace(/\D/g, ''))}
+      onBlur={() => commit(false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit(true);
+      }}
+    />
   );
 }
 
