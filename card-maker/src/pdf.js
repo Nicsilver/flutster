@@ -106,8 +106,23 @@ export function estimatePerPage(opts) {
 
 // Fronts are pixel-identical on every card (fixed spectrum skyline + QR): the
 // front is face-up while people guess, so it must not be memorizable.
+// Deck label: tiny vertical edition tag along the right edge, so mixed
+// printed decks can be sorted apart. Identical on every card of a deck, so
+// the identical-fronts rule holds. The left/right edges are the only bands
+// the skylines and the QR never reach.
+function drawLabel(doc, label, x, y, cardMm, k) {
+  doc.setFont('Baloo2', 'semibold');
+  doc.setFontSize(7 * k * PT_PER_MM);
+  doc.setTextColor(...rgb('#8d8577'));
+  doc.text(label.toUpperCase(), x + cardMm - 6 * k, y + cardMm / 2, {
+    align: 'center',
+    angle: 90,
+    charSpace: 0.3 * k,
+  });
+}
+
 export async function makeFrontsPdf(tracks, opts) {
-  const { cardMm, cut, style = 'color' } = opts;
+  const { cardMm, cut, style = 'color', label = '' } = opts;
   const L = layout(opts);
   const doc = newDoc();
   const k = cardMm / MOCK;
@@ -119,10 +134,13 @@ export async function makeFrontsPdf(tracks, opts) {
     const row = Math.floor(slot / L.cols);
     const { x, y } = cellXY(col, row, L, opts);
     if (cut) drawCut(doc, x, y, cardMm);
-    drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'top');
-    drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'bottom');
+    if (style !== 'minimal') {
+      drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'top');
+      drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'bottom');
+    }
     const qs = cardMm * 0.52;
     drawQr(doc, tracks[i].uri, x + (cardMm - qs) / 2, y + (cardMm - qs) / 2, qs);
+    if (label) drawLabel(doc, label, x, y, cardMm, k);
   }
   return doc;
 }
@@ -148,10 +166,13 @@ export async function makeBacksPdf(tracks, opts) {
 
     const t = tracks[i];
     const { seed, palette: full } = cardColors(t.uri);
+    const minimal = style === 'minimal';
     const palette = style === 'bw' ? [INK] : full;
     const pillColor = style === 'bw' ? INK : full[1];
-    drawSkyline(doc, x, y, k, seed, palette, 'top');
-    drawSkyline(doc, x, y, k, seed, palette, 'bottom');
+    if (!minimal) {
+      drawSkyline(doc, x, y, k, seed, palette, 'top');
+      drawSkyline(doc, x, y, k, seed, palette, 'bottom');
+    }
 
     const cx = x + cardMm / 2;
 
@@ -178,13 +199,18 @@ export async function makeBacksPdf(tracks, opts) {
     }
     cursor += gapA;
 
-    // The wide banner pill with white numerals.
+    // The wide banner pill with white numerals. Minimal style skips the fill
+    // and prints bare ink digits — the pill is the biggest ink sink on a card.
     const yearStr = String(t.year || '—');
-    doc.setFontSize(24 * k * PT_PER_MM);
-    const pillW = doc.getTextWidth(yearStr) + 60 * k;
-    doc.setFillColor(...rgb(pillColor));
-    doc.roundedRect(cx - pillW / 2, cursor, pillW, pillH, pillH / 2, pillH / 2, 'F');
-    doc.setTextColor(255, 253, 248);
+    doc.setFontSize((minimal ? 27 : 24) * k * PT_PER_MM);
+    if (minimal) {
+      doc.setTextColor(...rgb(INK));
+    } else {
+      const pillW = doc.getTextWidth(yearStr) + 60 * k;
+      doc.setFillColor(...rgb(pillColor));
+      doc.roundedRect(cx - pillW / 2, cursor, pillW, pillH, pillH / 2, pillH / 2, 'F');
+      doc.setTextColor(255, 253, 248);
+    }
     // Baloo's tall ascent: nudge the baseline so digits sit optically centered.
     doc.text(yearStr, cx, cursor + pillH * 0.73, { align: 'center' });
     cursor += pillH + gapT;
@@ -197,19 +223,6 @@ export async function makeBacksPdf(tracks, opts) {
       cursor += tLH;
     }
 
-    // Deck label: tiny vertical edition tag along the right edge, so mixed
-    // printed decks can be sorted apart again. The left/right edges are the
-    // only bands the skylines and the centered stack never reach.
-    if (label) {
-      doc.setFont('Baloo2', 'semibold');
-      doc.setFontSize(7 * k * PT_PER_MM);
-      doc.setTextColor(...rgb('#8d8577'));
-      doc.text(label.toUpperCase(), x + cardMm - 6 * k, y + cardMm / 2, {
-        align: 'center',
-        angle: 90,
-        charSpace: 0.3 * k,
-      });
-    }
   }
   return doc;
 }

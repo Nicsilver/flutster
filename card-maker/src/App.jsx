@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, fetchTracks, parseTrackIds, redirectUri, getClientId, setClientId, parsePlaylistId } from './spotify.js';
 import { verifyYears, saveOverride, plausibleYear } from './years.js';
+import { checkPreviews } from './previews.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
 import { cardColors, rz, INK } from './cardstyle.js';
 
@@ -190,6 +191,10 @@ export default function App() {
   const dlRef = useRef({ fronts: '', backs: '', set: [] });
   const verifRun = useRef(0);
   const verifCtrl = useRef(null);
+  // Cards with no iTunes 30s preview: silent in preview-playback mode, so
+  // worth knowing before printing. Checked in the background per deck.
+  const [prevMiss, setPrevMiss] = useState(() => new Set());
+  const prevCtrl = useRef(null);
   const playlistRef = useRef(null);
   const theme = useTheme();
   useEffect(() => {
@@ -372,6 +377,24 @@ export default function App() {
     });
   }
 
+  function startPreviewCheck(data) {
+    prevCtrl.current?.abort();
+    const ctrl = new AbortController();
+    prevCtrl.current = ctrl;
+    setPrevMiss(new Set());
+    checkPreviews(data.tracks, {
+      signal: ctrl.signal,
+      onUpdate: (uri, ok) => {
+        if (ctrl.signal.aborted || ok) return;
+        setPrevMiss((prev) => {
+          const next = new Set(prev);
+          next.add(uri);
+          return next;
+        });
+      },
+    }).catch(() => {});
+  }
+
   function startVerify(data, id, count) {
     const run = ++verifRun.current;
     setStripHidden(false);
@@ -523,6 +546,7 @@ export default function App() {
       dlRef.current = { fronts: '', backs: '', set: [] };
       if (id) setFp(id, count ?? -1, fingerprint(data.tracks));
       startVerify(data, id, count);
+      startPreviewCheck(data);
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
@@ -554,6 +578,7 @@ export default function App() {
       setNudge(false);
       dlRef.current = { fronts: '', backs: '', set: [] };
       startVerify(data, null, null);
+      startPreviewCheck(data);
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
@@ -724,6 +749,14 @@ export default function App() {
                 <span className="st-actmeta">
                   {tracks.length} cards · {pages} page{pages !== 1 ? 's' : ''}
                   {overCap > 0 && <> · {overCap} over cap</>}
+                  {prevMiss.size > 0 && (
+                    <span
+                      className="noprev-count"
+                      title="These songs have no 30-second iTunes preview. They play fine through Spotify; in preview-playback mode they would be silent."
+                    >
+                      {' '}· {prevMiss.size} without preview
+                    </span>
+                  )}
                 </span>
                 <span className="grow" />
                 <button className="primary" onClick={() => download('fronts')} disabled={!!busy}>
@@ -905,6 +938,14 @@ export default function App() {
                       <YearTag t={t} onEdit={editYear} />
                       <b>{t.artist}</b>
                       <i>{t.title}</i>
+                      {prevMiss.has(t.uri) && (
+                        <span
+                          className="noprev-tag"
+                          title="No 30-second iTunes preview found. Plays fine through Spotify; silent in preview-playback mode."
+                        >
+                          no preview
+                        </span>
+                      )}
                       {tag && (
                         <span
                           className={'cap-tag' + (ps === 'stale' && state === 'in' ? ' rp' : '') + (ps ? ' ct-btn' : '')}
@@ -952,7 +993,6 @@ export default function App() {
             cut={cut}
             hasPlaylist={!!playlist}
             cardStyle={cardStyle}
-            label={deckLabel.trim()}
           />
           <div className="st-a4cap">A4 · {grid.cols}×{grid.rows} grid · {cardMm} mm cards</div>
           <div className="st-setrow">
@@ -986,6 +1026,7 @@ export default function App() {
             >
               <option value="color">Colour</option>
               <option value="bw">B&W · ink saver</option>
+              <option value="minimal">Minimal · least ink</option>
             </select>
           </div>
           <div className="st-setrow">
@@ -997,7 +1038,7 @@ export default function App() {
               value={deckLabel}
               disabled={!playlist}
               onChange={(e) => setDeckLabel(e.target.value)}
-              title="Tiny tag printed on each card back's edge, for telling mixed decks apart."
+              title="Tiny tag printed along each card front's edge, for telling mixed decks apart. Same on every card, so fronts stay unmemorable."
             />
           </div>
           <div className="st-setrow">
@@ -1450,9 +1491,10 @@ function RowYear({ t, onEdit, onKeep, done }) {
 }
 
 // Mini render of the real card design (155): double skyline, wide year pill.
-function CellBack({ t, cardStyle, label }) {
+function CellBack({ t, cardStyle }) {
   const { seed, palette } = cardColors(t.uri);
   const bw = cardStyle === 'bw';
+  const minimal = cardStyle === 'minimal';
   const pill = bw ? INK : palette[1];
   const strip = (edge, s) => (
     <span className={'cellsky ' + edge}>
@@ -1469,17 +1511,18 @@ function CellBack({ t, cardStyle, label }) {
   );
   return (
     <>
-      {strip('t', seed + 4)}
-      <span className="yr yrpill" style={{ background: pill }}>{t.year || '—'}</span>
+      {!minimal && strip('t', seed + 4)}
+      <span className={'yr yrpill' + (minimal ? ' plain' : '')} style={{ background: minimal ? 'transparent' : pill }}>
+        {t.year || '—'}
+      </span>
       <b>{t.artist}</b>
       <i>{t.title}</i>
-      {strip('b', seed)}
-      {label && <span className="cell-label">{label}</span>}
+      {!minimal && strip('b', seed)}
     </>
   );
 }
 
-function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist, cardStyle, label }) {
+function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist, cardStyle }) {
   const p = Math.max(0, page);
   const cells = Array.from({ length: grid.perPage }, (_, i) => tracks[p * grid.perPage + i] || null);
   const density = grid.cols >= 5 ? ' tiny' : grid.cols === 4 ? ' dense' : '';
@@ -1495,7 +1538,7 @@ function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut,
       >
         {cells.map((t, i) => (
           <div key={i} className={'sheet-cell' + (cut && (t || !hasPlaylist) ? ' cut' : '')}>
-            {t && <CellBack t={t} cardStyle={cardStyle} label={label} />}
+            {t && <CellBack t={t} cardStyle={cardStyle} />}
           </div>
         ))}
       </div>
