@@ -156,6 +156,21 @@ function useTheme() {
   return { isDark: theme === 'dark', toggle };
 }
 
+// Below 900px the studio swaps its three side-by-side zones for a dock: two
+// tabs (decks, songs) and a Print button that raises the layout rail as a
+// bottom sheet. Desktop keeps the three-zone layout untouched.
+const MOBILE_MQ = '(max-width: 900px)';
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.matchMedia(MOBILE_MQ).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_MQ);
+    const onChange = (e) => setMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return mobile;
+}
+
 export default function App() {
   // Spotify mode (BYO developer app, full API) vs Preview mode (no accounts:
   // pasted links + metadata mirror + iTunes preview clips). Empty = not
@@ -216,6 +231,26 @@ export default function App() {
   useEffect(() => {
     playlistRef.current = playlist;
   }, [playlist]);
+
+  const isMobile = useIsMobile();
+  // Mobile dock: which zone the phone shows ('decks' | 'songs') and whether
+  // the print sheet is up. Both are inert on desktop.
+  const [mtab, setMtab] = useState('decks');
+  const [printOpen, setPrintOpen] = useState(false);
+  // "Print anyway" on the sheet's flagged-years banner; re-arms per opening.
+  const [gateOk, setGateOk] = useState(false);
+  useEffect(() => {
+    if (playlist) setMtab('songs');
+  }, [playlist]);
+  useEffect(() => {
+    setGateOk(false);
+    if (!isMobile) return;
+    // The sheet is fixed-position; freeze the page behind it.
+    document.body.style.overflow = printOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [printOpen, isMobile]);
 
   const [perRow, setPerRow] = useState(3);
   const [cut, setCut] = useState(true);
@@ -780,7 +815,7 @@ export default function App() {
         </>
       }
     >
-      <div className="studio fade-in">
+      <div className={`studio fade-in m-${mtab}${printOpen ? ' m-printopen' : ''}`}>
         {/* LEFT — playlists (Spotify mode) or saved pasted decks (Preview mode) */}
         <aside className="st-rail">
           <div className="st-rh">
@@ -1142,9 +1177,31 @@ export default function App() {
           )}
         </main>
 
-        {/* RIGHT — real sheet preview + layout settings */}
+        {/* RIGHT — real sheet preview + layout settings. On mobile this same
+            rail rises as the print sheet, gaining a grab handle, the flagged-
+            years banner, the download buttons and the mark-printed nudge. */}
         <aside className="st-rail st-right">
-          <div className="st-rh">Print preview</div>
+          {isMobile && (
+            <button className="m-grab" onClick={() => setPrintOpen(false)} aria-label="Close print sheet">
+              <span />
+            </button>
+          )}
+          <div className="st-rh">
+            Print preview
+            {isMobile && playlist && toPrintN > 0 && toPrintN < included.length && (
+              <span className="badge">{toPrintN} to print</span>
+            )}
+          </div>
+          {isMobile && printOpen && flagged.length > 0 && !gateOk && (
+            <div className="m-gate">
+              <b>{flagged.length} year{flagged.length !== 1 ? 's' : ''} still flagged</b>
+              <p>These cards would print with unconfirmed years.</p>
+              <div className="printpop-row">
+                <button className="primary sm-cta" onClick={openReview}>Review first</button>
+                <button className="ghost sm" onClick={() => setGateOk(true)}>Print anyway</button>
+              </div>
+            </div>
+          )}
           <SheetPreview
             tracks={tracks}
             grid={grid}
@@ -1218,8 +1275,72 @@ export default function App() {
               </span>
             </span>
           </div>
+          {isMobile && (
+            <>
+              <div className={'m-dl' + (flagged.length > 0 && !gateOk ? ' dim' : '')}>
+                <button className="primary alt" onClick={() => download('fronts')} disabled={!!busy || !playlist}>
+                  {busy === 'fronts' ? 'Building…' : 'Fronts PDF'}
+                </button>
+                <button className="primary spectrum" onClick={() => download('backs')} disabled={!!busy || !playlist}>
+                  {busy === 'backs' ? 'Building…' : 'Backs PDF'}
+                </button>
+              </div>
+              {nudge && (
+                <div className="m-nudge">
+                  <b>Printed these for real?</b>
+                  <p>
+                    You downloaded fronts and backs for {dlRef.current.set.length} cards. Mark them
+                    printed and they&rsquo;ll drop out of &ldquo;new&rdquo;.
+                  </p>
+                  <div className="printpop-row">
+                    <button className="primary sm-cta" onClick={() => markPrinted(dlRef.current.set)}>
+                      Mark {dlRef.current.set.length} printed
+                    </button>
+                    <button className="ghost sm" onClick={() => setNudge(false)}>Not yet</button>
+                  </div>
+                </div>
+              )}
+              <div className="printnote">
+                <span className="printnote-ic">🖨️</span>
+                <div>
+                  Print the <b>Fronts</b> PDF, put the stack back in the tray, flip on the{' '}
+                  <b>{flip === 'long' ? 'long edge (left↔right)' : 'short edge (top↕bottom)'}</b>,
+                  then print the <b>Backs</b> PDF. Use <b>100% / actual size</b> and do one test sheet first.
+                </div>
+              </div>
+            </>
+          )}
         </aside>
       </div>
+      {isMobile && printOpen && <button className="m-backdrop" onClick={() => setPrintOpen(false)} aria-label="Close print sheet" />}
+      {isMobile && (
+        <nav className="dock">
+          <button
+            className={'dock-tab' + (mtab === 'decks' && !printOpen ? ' on' : '')}
+            onClick={() => { setMtab('decks'); setPrintOpen(false); }}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
+            {inPreview ? 'Decks' : 'Playlists'}
+            <i className="dock-dot" />
+          </button>
+          <button
+            className={'dock-tab' + (mtab === 'songs' && !printOpen ? ' on' : '')}
+            onClick={() => { setMtab('songs'); setPrintOpen(false); }}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1" /><rect x="13" y="4" width="7" height="7" rx="1" /><rect x="4" y="13" width="7" height="7" rx="1" /><rect x="13" y="13" width="7" height="7" rx="1" /></svg>
+            Songs
+            {playlist && flagged.length > 0 && <span className="dock-badge">{flagged.length}</span>}
+            <i className="dock-dot" />
+          </button>
+          <button
+            className="dock-print"
+            disabled={!playlist}
+            onClick={() => setPrintOpen((v) => !v)}
+          >
+            Print{playlist && toPrintN > 0 ? ` · ${toPrintN}` : ''} ▴
+          </button>
+        </nav>
+      )}
       {yearsModal && playlist && (
         <YearsJsonModal
           tracks={playlist.tracks}

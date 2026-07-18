@@ -25,10 +25,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install & build
+      - name: Install, test & build
         working-directory: card-maker
         run: |
           npm ci
+          npm test
           npm run build -- --base=/flutster/
       - uses: actions/upload-pages-artifact@v3
         with:

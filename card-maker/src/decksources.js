@@ -51,7 +51,8 @@ async function fetchSource(url) {
   return r.json();
 }
 
-function merge(data) {
+// Exported for the test suite; loadAllSources is the real entry point.
+export function merge(data) {
   let added = 0;
   const add = (deck, number, uri, title = '', artist = '', year = 0) => {
     if (!decks.has(deck)) decks.set(deck, new Map());
@@ -98,6 +99,12 @@ export async function loadAllSources() {
 }
 
 export function invalidateSources() {
+  loadedSig = null;
+}
+
+// Test-only: the module keeps its card map in module state.
+export function clearDecksForTest() {
+  decks.clear();
   loadedSig = null;
 }
 

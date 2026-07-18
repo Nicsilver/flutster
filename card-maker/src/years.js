@@ -107,7 +107,9 @@ async function mbLookup(isrcs, signal) {
 
 // --- iTunes -----------------------------------------------------------------
 
-const norm = (s) =>
+// norm/baseTitle/canonTitle/leadArtist are exported for the test suite only;
+// nothing outside this module should build matching logic on them.
+export const norm = (s) =>
   String(s || '')
     .toLowerCase()
     .normalize('NFD')
@@ -115,14 +117,14 @@ const norm = (s) =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 // "Song - Remastered 2011" / "Song (Live)" → "song" for comparing versions.
-const baseTitle = (s) => norm(String(s || '').replace(/\s*[([].*?[)\]]/g, '').split(' - ')[0]);
+export const baseTitle = (s) => norm(String(s || '').replace(/\s*[([].*?[)\]]/g, '').split(' - ')[0]);
 // "Pt1" / "Pt. 1" / "Part One" suffixes vary per catalog and never change the
 // year — drop them so the same song matches across sources.
-const canonTitle = (s) => baseTitle(s).replace(/\b(?:pt|part)\s*(?:one|two|three|\d+)$/, '').trim();
+export const canonTitle = (s) => baseTitle(s).replace(/\b(?:pt|part)\s*(?:one|two|three|\d+)$/, '').trim();
 // "Kay Kyser & His Orchestra" / "Frankie Carle with Marjorie Hughes" →
 // "Kay Kyser" / "Frankie Carle": big-band credits vary per catalog and break
 // artist filters. Deliberately narrow — "Ike & Tina Turner" must survive.
-const leadArtist = (s) =>
+export const leadArtist = (s) =>
   String(s || '')
     .split(',')[0]
     .replace(/\s+(?:&|and)\s+(?:his|her|the)\s.*$/i, '')

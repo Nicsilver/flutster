@@ -719,18 +719,96 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .toggle input:checked + .track { background: var(--dec90); }
 .toggle input:checked + .track .thumb { transform: translateX(16px); }
 
-/* Small screens: single-column studio with a scrollable playlist rail, a
-   capped sheet preview, and everything else given room to wrap. Kept at the
-   end of the file so these override the base rules above. */
+/* Small screens: the studio becomes a docked app — two tabs (decks, songs)
+   plus a Print button that raises the layout rail as a bottom sheet. Kept at
+   the end of the file so these override the base rules above. */
 @media (max-width: 900px) {
-  .wrap { padding: 18px 14px 48px; }
+  .wrap { padding: 18px 14px 84px; }
   .topbar { margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
   .top-actions { flex-wrap: wrap; }
-  .studio { gap: 24px; }
-  .st-pllist { max-height: 38vh; overflow-y: auto; }
-  .st-right { max-width: 360px; width: 100%; margin: 0 auto; }
+
+  /* one zone at a time, chosen by the dock */
+  .studio { display: block; }
+  .studio .st-rail:not(.st-right) { display: none; }
+  .studio.m-decks .st-rail:not(.st-right) { display: block; }
+  .studio.m-decks .st-mid { display: none; }
+  .st-pllist { max-height: none; overflow: visible; padding-right: 0; }
+
+  /* desktop-only pieces of the songs zone: the action-row download buttons
+     (they live in the print sheet here) and the mid-column print note */
   .st-act { flex-wrap: wrap; gap: 10px; }
   .st-act h2 { flex: 1 1 100%; white-space: normal; }
+  .st-act .primary, .st-act .printwrap { display: none; }
+  .st-mid .printnote { display: none; }
+  .st-actmeta { font-size: 12px; }
+
+  /* the layout rail as a print sheet */
+  .studio .st-right { display: none; }
+  .studio.m-printopen .st-right {
+    display: block; position: fixed; z-index: 76; left: 0; right: 0; bottom: 0; top: 9%;
+    margin: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--panel);
+    border-radius: 18px 18px 0 0; padding: 6px 18px 26px; box-shadow: var(--sheet-shadow);
+  }
+  .studio.m-printopen .sheet { max-width: 280px; margin: 0 auto; }
+  .m-backdrop {
+    position: fixed; inset: 0; z-index: 74; border: 0; padding: 0; cursor: pointer;
+    background: color-mix(in srgb, var(--ink) 42%, transparent);
+  }
+  .m-grab { display: block; width: 100%; background: transparent; padding: 6px 0 12px; }
+  .m-grab span { display: block; width: 42px; height: 4px; border-radius: 999px; background: var(--bar); margin: 0 auto; }
+  .m-gate {
+    border: 1px solid color-mix(in srgb, var(--dec70) 55%, var(--line));
+    background: color-mix(in srgb, var(--dec70) 9%, var(--panel));
+    border-radius: 12px; padding: 11px 13px; margin-bottom: 12px;
+  }
+  .m-gate b { font-size: 13px; color: var(--dec70); }
+  .m-gate p { margin: 3px 0 9px; font-size: 12.5px; color: var(--muted); }
+  .m-dl { display: flex; gap: 10px; margin-top: 14px; }
+  .m-dl .primary { flex: 1; padding: 12px 10px; }
+  .m-dl.dim .primary { opacity: 0.55; }
+  .m-nudge {
+    border: 1px solid var(--line); background: var(--field); border-radius: 12px;
+    padding: 11px 13px; margin-top: 12px;
+  }
+  .m-nudge b { font-size: 13px; }
+  .m-nudge p { margin: 3px 0 9px; font-size: 12.5px; color: var(--muted); }
+  .st-right .printnote { margin-top: 14px; flex-direction: column; gap: 8px; }
+
+  /* the dock: dark in both themes, spectrum hairline on top */
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    display: flex; align-items: stretch; gap: 4px;
+    background: #15171e; padding: 7px 10px calc(9px + env(safe-area-inset-bottom));
+  }
+  .dock::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--spectrum); }
+  .dock-tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
+    background: transparent; color: #8b8e99; font-size: 10.5px; font-weight: 700; padding: 3px 0 0;
+  }
+  .dock-tab.on { color: #fffdf8; }
+  .dock-tab .dock-dot { display: block; width: 0; height: 3px; border-radius: 999px; margin-top: 2px; transition: width 0.15s ease; }
+  .dock-tab.on .dock-dot { width: 22px; background: var(--spectrum); }
+  .dock-badge {
+    position: absolute; transform: translate(20px, -2px);
+    min-width: 15px; padding: 0 4px; border-radius: 999px; background: var(--dec70);
+    color: #fff; font-size: 9px; font-weight: 800; line-height: 15px;
+  }
+  .dock-tab { position: relative; }
+  .dock-print {
+    flex: 1.15; align-self: center; background: #f7f2e9; color: #15171e;
+    border-radius: 9px; padding: 10px 8px; font-weight: 800; font-size: 12.5px; white-space: nowrap;
+  }
+  .dock-print:disabled { opacity: 0.45; }
+
+  /* modals sit above the dock; the review proof sheet goes full screen */
+  .rvm-back { z-index: 85; padding: 0; }
+  .rvm { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; }
+  .rvm-head { padding: 12px 14px 9px; }
+  .rvm-body { padding: 2px 14px; }
+  .rvm-foot { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  .rvr { gap: 10px; }
+  .yjm { padding: 18px 16px; }
+
   .hero { padding: 26px 6px 16px; }
   .mode-cards { gap: 14px; }
   .mode-card { max-width: none; }
@@ -738,18 +816,11 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
   .sp-login { padding: 32px 18px 26px; }
   .sp-meta { gap: 10px; }
   .setup-save { flex-wrap: wrap; }
-  .rvm-head { padding: 12px 14px 9px; }
-  .rvm-body { padding: 2px 14px; }
-  .rvm-foot { padding: 10px 14px; }
-  .rvr { gap: 10px; }
-  .yjm { padding: 18px 16px; }
   .play-sheet { padding: 20px 16px; }
   .printnote { flex-direction: column; gap: 8px; }
 }
 
 @media (max-width: 560px) {
-  .st-act .primary { flex: 1 1 auto; }
-  .st-actmeta { font-size: 12px; }
   .rvr-kept { width: 44px; }
   .pv-how { padding: 14px; }
   .setup-steps li { padding-left: 38px; }
