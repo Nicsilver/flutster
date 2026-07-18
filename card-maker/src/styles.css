@@ -385,6 +385,13 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
   border-top: 1px dashed var(--line);
   color: var(--muted); font-size: 12px; line-height: 1.5;
 }
+.mode-warn {
+  display: block; margin-top: auto; padding: 10px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--dec60) 13%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--dec60) 45%, var(--line));
+  color: var(--ink); font-size: 12.5px; line-height: 1.55;
+}
+.mode-warn b { font-size: 12.5px; color: color-mix(in srgb, var(--dec70) 75%, var(--ink)); }
 .mode-cta { width: 100%; margin-top: 15px; }
 
 /* Spotify-mode gate (setup + login, one doorway) */

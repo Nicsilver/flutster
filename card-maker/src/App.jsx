@@ -1222,12 +1222,14 @@ function ModeChooser({ onPick }) {
             <li>The richest song data for year checking</li>
             <li>Uses your own free Spotify developer app + Premium</li>
           </ul>
-          <span className="mode-note">
-            Spotify has paused new developer signups, so this path currently needs an app you
-            already created.
+          <span className="mode-warn">
+            <b>Currently locked for new users.</b> This mode needs a free &ldquo;developer
+            app&rdquo; made in Spotify&rsquo;s dashboard, and Spotify is not letting anyone create
+            new ones right now. If you never made one, you cannot get in yet: pick Preview mode
+            instead.
           </span>
-          <button className="primary mode-cta" onClick={(e) => { e.stopPropagation(); onPick('spotify'); }}>
-            Choose Spotify mode
+          <button className="ghost mode-cta" onClick={(e) => { e.stopPropagation(); onPick('spotify'); }}>
+            I already have a developer app
           </button>
         </div>
         <div className="mode-card" onClick={() => onPick('preview')}>
