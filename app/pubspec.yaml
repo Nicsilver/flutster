@@ -18,6 +18,9 @@ dependencies:
   # persist settings
   shared_preferences: ^2.3.2
   url_launcher: ^6.3.2
+  # preview-mode playback (30s iTunes clips; Java MediaPlayer under the hood,
+  # no bundled native libs, so no 16 KB page-size concerns)
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_lints: ^4.0.0

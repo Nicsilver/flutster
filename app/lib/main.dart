@@ -6,7 +6,10 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:spotify_sdk/models/player_state.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:audioplayers/audioplayers.dart' hide PlayerState;
+
 import 'card_resolver.dart';
+import 'preview_service.dart';
 import 'settings.dart';
 import 'spotify_service.dart';
 
@@ -269,7 +272,9 @@ class _ScanHomeState extends State<ScanHome> {
     if (AppSettings.instance.hasClientId) {
       _connectSpotify();
     } else {
-      _spotifyStatus = 'Tap to connect';
+      // No Spotify app configured = preview mode: cards play 30s iTunes clips.
+      _spotifyOk = true;
+      _spotifyStatus = 'Previews';
     }
     for (final src in AppSettings.instance.deckSources.value) {
       _resolver.loadSource(src).catchError((_) => 0);
@@ -321,6 +326,11 @@ class _ScanHomeState extends State<ScanHome> {
 
     if (track == null) {
       _snack('Card ${card!.id} isn\'t in the deck map yet.');
+    } else if (!AppSettings.instance.hasClientId) {
+      // Preview mode: no Spotify at all — resolve and play a 30s iTunes clip.
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => PreviewPlayingScreen(track: track),
+      ));
     } else if (!_spotify.isConnected) {
       _snack('Connect Spotify first.');
       await _connectSpotify();
@@ -681,6 +691,205 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   }
 }
 
+/// Preview-mode player: streams a looping 30-second iTunes clip. Same
+/// blind-guess layout as [NowPlayingScreen]; no title/artist shown, no save
+/// button (there is no Spotify account to save to).
+class PreviewPlayingScreen extends StatefulWidget {
+  final ResolvedTrack track;
+  const PreviewPlayingScreen({super.key, required this.track});
+  @override
+  State<PreviewPlayingScreen> createState() => _PreviewPlayingScreenState();
+}
+
+class _PreviewPlayingScreenState extends State<PreviewPlayingScreen> {
+  final _player = AudioPlayer();
+  StreamSubscription<Duration>? _posSub;
+  bool _resolving = true;
+  bool _miss = false;
+  bool _paused = false;
+  int _posMs = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    final t = widget.track;
+    final clip = await PreviewService.instance.resolve(
+      t.spotifyUri,
+      title: t.title.isEmpty ? null : t.title,
+      artist: t.artist.isEmpty ? null : t.artist,
+    );
+    if (!mounted) return;
+    if (clip == null) {
+      setState(() {
+        _resolving = false;
+        _miss = true;
+      });
+      return;
+    }
+    setState(() => _resolving = false);
+    // Loop: the clip is only 30s and the table may still be arguing.
+    await _player.setReleaseMode(ReleaseMode.loop);
+    _posSub = _player.onPositionChanged.listen((d) {
+      if (mounted) setState(() => _posMs = d.inMilliseconds);
+    });
+    await _player.play(UrlSource(clip.previewUrl));
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    _player.dispose();
+    super.dispose();
+  }
+
+  void _guess() => Navigator.of(context).pop();
+
+  void _togglePlay() {
+    setState(() => _paused = !_paused);
+    _paused ? _player.pause() : _player.resume();
+  }
+
+  void _restart() {
+    _player.seek(Duration.zero);
+    if (_paused) {
+      _player.resume();
+      setState(() => _paused = false);
+    }
+  }
+
+  String _fmt(int ms) {
+    final s = (ms / 1000).floor();
+    return '${(s ~/ 60)}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _player.stop();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: DecadesBackground(
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      iconSize: 32,
+                      icon: const Icon(Icons.close),
+                      onPressed: _guess,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_resolving) ...[
+                    const SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: CircularProgressIndicator(strokeWidth: 3)),
+                    const SizedBox(height: 28),
+                    BrandText('Finding the song…',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                  ] else if (_miss) ...[
+                    Icon(Icons.music_off,
+                        size: 120,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.85)),
+                    const SizedBox(height: 28),
+                    BrandText('No preview for this one',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    Text('Put the card back and draw another.',
+                        style: Theme.of(context).textTheme.bodyLarge),
+                  ] else ...[
+                    Icon(Icons.music_note,
+                        size: 120,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.85)),
+                    const SizedBox(height: 28),
+                    BrandText('Guess the year',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineLarge
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text('30 second preview',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.55))),
+                    const SizedBox(height: 20),
+                    Text(_fmt(_posMs),
+                        style: Theme.of(context)
+                            .textTheme
+                            .displaySmall
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 16),
+                    IconButton(
+                      iconSize: 96,
+                      onPressed: _togglePlay,
+                      icon:
+                          Icon(_paused ? Icons.play_circle : Icons.pause_circle),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _restart,
+                      icon: const Icon(Icons.restart_alt, size: 26),
+                      label:
+                          const Text('Restart', style: TextStyle(fontSize: 16)),
+                    ),
+                  ],
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _miss
+                        ? PrimaryButton(
+                            onPressed: _guess,
+                            padding: const EdgeInsets.symmetric(vertical: 30),
+                            child: const Text('SCAN NEXT',
+                                style: TextStyle(
+                                    fontSize: 28, fontWeight: FontWeight.bold)),
+                          )
+                        : SpectrumButton(
+                            onPressed: _guess,
+                            padding: const EdgeInsets.symmetric(vertical: 30),
+                            child: const Text('GUESS',
+                                style: TextStyle(
+                                    fontSize: 28, fontWeight: FontWeight.bold)),
+                          ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -748,7 +957,7 @@ class SettingsScreen extends StatelessWidget {
                   title: const Text('Client ID'),
                   subtitle: Text(has
                       ? _mask(id)
-                      : 'Not set. Connect your own Spotify app.'),
+                      : 'Not set. Cards play 30 second preview clips; connect your own Spotify app for full songs.'),
                   trailing: has
                       ? const _TagChip('Added')
                       : const Icon(Icons.chevron_right),
@@ -921,7 +1130,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         appBar: AppBar(
           title: const Text('Connect Spotify'),
           actions: [
-            TextButton(onPressed: _skip, child: const Text('Skip for now')),
+            TextButton(
+                onPressed: _skip, child: const Text('Skip · play with previews')),
             const SizedBox(width: 6),
           ],
         ),
