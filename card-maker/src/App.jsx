@@ -709,7 +709,7 @@ export default function App() {
 
   if (!mode) {
     return (
-      <Shell narrow isDark={theme.isDark} action={themeBtn}>
+      <Shell isDark={theme.isDark} action={themeBtn}>
         <ModeChooser onPick={setMode} />
       </Shell>
     );
