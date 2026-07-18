@@ -35,6 +35,34 @@ export default function PlayScreen({ token, onExit }) {
     localStorage.setItem('flutster_playsrc', s);
   }
 
+  // audio.play()'s promise stays pending while the clip buffers, so waiting on
+  // it can hang forever on a slow connection. Settle on events instead:
+  // 'playing' wins, an autoplay rejection means one tap is needed, and a media
+  // error or 15s of silence is a failure.
+  function startClip(url) {
+    return new Promise((resolve) => {
+      const a = audioRef.current;
+      let done = false;
+      const finish = (v) => {
+        if (done) return;
+        done = true;
+        a.removeEventListener('playing', onOk);
+        a.removeEventListener('error', onBad);
+        clearTimeout(t);
+        resolve(v);
+      };
+      const onOk = () => finish('playing');
+      const onBad = () => finish('error');
+      a.addEventListener('playing', onOk);
+      a.addEventListener('error', onBad);
+      const t = setTimeout(() => finish('error'), 15000);
+      a.src = url;
+      a.play()
+        .then(() => finish('playing'))
+        .catch((e) => finish(e.name === 'NotAllowedError' ? 'tap' : 'error'));
+    });
+  }
+
   async function onScan(text) {
     if (busyRef.current) return;
     const id = parseTrackIds(text)[0];
@@ -58,14 +86,12 @@ export default function PlayScreen({ token, onExit }) {
           busyRef.current = false;
           return;
         }
-        const a = audioRef.current;
-        a.src = url;
-        try {
-          await a.play();
-          setPhase('playing');
-        } catch {
-          // Autoplay blocked (typically iOS): needs one tap.
-          setPhase('tap');
+        const res = await startClip(url);
+        if (res === 'playing') setPhase('playing');
+        else if (res === 'tap') setPhase('tap');
+        else {
+          setMsg('The preview clip failed to load. Check your connection and rescan.');
+          setPhase('error');
         }
       }
     } catch (e) {
@@ -256,7 +282,13 @@ export default function PlayScreen({ token, onExit }) {
 
       {phase === 'tap' && (
         <div className="play-stage center">
-          <button className="tap-play" onClick={() => audioRef.current.play().then(() => setPhase('playing')).catch(() => {})}>
+          <button
+            className="tap-play"
+            onClick={() => {
+              audioRef.current.play().catch(() => {});
+              setPhase('playing');
+            }}
+          >
             ▶
           </button>
           <h2>Tap to play</h2>
