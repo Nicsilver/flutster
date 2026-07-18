@@ -431,6 +431,21 @@ export default function App() {
     setPrintFilter(false);
   }
 
+  // Queue a printed card for reprint (lost/damaged): drop its ledger entry
+  // so it counts as new again and joins the to-print filter.
+  function unmarkPrinted(uri) {
+    if (!plKey) return;
+    setPrintedAll((prev) => {
+      const cards = { ...(prev[plKey]?.cards || {}) };
+      delete cards[uri];
+      const next = { ...prev, [plKey]: { ...prev[plKey], cards } };
+      try {
+        localStorage.setItem(PRINTED_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }
+
   function openReview() {
     setPrintPop(false);
     setReviewUris(flagged.map((t) => t.uri));
@@ -768,7 +783,10 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <p className="pick-hint">Tap a card to include or exclude it.</p>
+              <p className="pick-hint">
+                Tap a card to include or exclude it.
+                {printedN > 0 && ' Tap a card’s printed tag to queue it for a reprint.'}
+              </p>
               <div className="backs-preview">
                 {ordered.map((t) => {
                   const state = excluded.has(t._idx) ? 'excluded' : finalSet.has(t._idx) ? 'in' : 'over';
@@ -796,7 +814,22 @@ export default function App() {
                       <YearTag t={t} onEdit={editYear} />
                       <b>{t.artist}</b>
                       <i>{t.title}</i>
-                      {tag && <span className={'cap-tag' + (ps === 'stale' && state === 'in' ? ' rp' : '')}>{tag}</span>}
+                      {tag && (
+                        <span
+                          className={'cap-tag' + (ps === 'stale' && state === 'in' ? ' rp' : '') + (ps ? ' ct-btn' : '')}
+                          title={ps ? 'Take the printed mark off — the card queues for a reprint.' : undefined}
+                          onClick={
+                            ps
+                              ? (e) => {
+                                  e.stopPropagation();
+                                  unmarkPrinted(t.uri);
+                                }
+                              : undefined
+                          }
+                        >
+                          {tag}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
