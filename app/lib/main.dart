@@ -182,7 +182,10 @@ class DecadesBackground extends StatelessWidget {
   }
 }
 
-/// Primary action painted with the decade spectrum — GUESS and the setup pager.
+/// Primary action carrying the brand spectrum — GUESS and the setup pager.
+/// Solid ink like [PrimaryButton]; the spectrum shows as a slim strip along
+/// the bottom edge (a full-bleed gradient fill reads garish at button size —
+/// on the web the spectrum is likewise always a thin strip, never a fill).
 class SpectrumButton extends StatelessWidget {
   const SpectrumButton({
     super.key,
@@ -197,30 +200,47 @@ class SpectrumButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final enabled = onPressed != null;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient:
-            enabled ? const LinearGradient(colors: decadeSpectrum) : null,
-        color: enabled ? null : scheme.onSurface.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onPressed,
-          child: Padding(
-            padding: padding,
-            child: Center(
-              child: DefaultTextStyle.merge(
-                style: TextStyle(
-                    color: enabled
-                        ? Colors.white
-                        : scheme.onSurface.withValues(alpha: 0.4),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16),
-                child: child,
-              ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: enabled
+              ? scheme.primary
+              : scheme.onSurface.withValues(alpha: 0.12),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onPressed,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: padding,
+                  child: Center(
+                    child: DefaultTextStyle.merge(
+                      style: TextStyle(
+                          color: enabled
+                              ? scheme.onPrimary
+                              : scheme.onSurface.withValues(alpha: 0.4),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16),
+                      child: child,
+                    ),
+                  ),
+                ),
+                if (enabled)
+                  const Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 4,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: decadeSpectrum),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
