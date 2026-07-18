@@ -309,7 +309,7 @@ export default function App() {
     }
   }, [verif, flagged.length, stripHidden]);
   const finalSet = new Set(tracks.map((t) => t._idx));
-  const overCap = included.length - tracks.length;
+  const overCap = printable.length - tracks.length;
   const pages = Math.max(1, Math.ceil(tracks.length / grid.perPage));
   const isLink = /^https?:\/\//i.test(railQuery.trim()) || /spotify:playlist/i.test(railQuery);
   const q = railQuery.trim().toLowerCase();
