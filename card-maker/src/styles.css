@@ -347,6 +347,21 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .yjm-row .grow { flex: 1; }
 .yjm-res { font-size: 12.5px; font-weight: 700; color: var(--dec90); }
 .yjm-err { font-size: 12.5px; font-weight: 700; color: var(--dec70); }
+
+/* Deck label: rail input + tiny vertical tag on sheet-preview backs */
+.st-lab {
+  width: 110px; padding: 6px 9px; font-family: inherit; font-size: 12.5px; font-weight: 600;
+  background: var(--field); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px; text-align: right;
+}
+.st-lab:focus { outline: none; border-color: var(--link); }
+.st-lab:disabled { opacity: 0.5; }
+.cell-label {
+  position: absolute; right: 1.5%; top: 50%;
+  transform: translate(50%, -50%) rotate(90deg);
+  font-size: 4px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--paper-sub); white-space: nowrap; pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) { .vspin { animation: none; } }
 .vreview { background: var(--dec70) !important; }
 .primary.sm-cta { padding: 8px 15px; font-size: 12px; flex: none; }

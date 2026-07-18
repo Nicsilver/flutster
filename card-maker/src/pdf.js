@@ -130,7 +130,7 @@ export async function makeFrontsPdf(tracks, opts) {
 // Mirror the back so cards align after flipping the sheet:
 // 'long' flips left/right (mirror columns), 'short' flips top/bottom (mirror rows).
 export async function makeBacksPdf(tracks, opts) {
-  const { cardMm, cut, flip, style = 'color' } = opts;
+  const { cardMm, cut, flip, style = 'color', label = '' } = opts;
   const L = layout(opts);
   const doc = newDoc();
   const k = cardMm / MOCK;
@@ -195,6 +195,20 @@ export async function makeBacksPdf(tracks, opts) {
     for (const line of title.lines) {
       doc.text(line, cx, cursor + tLH * 0.8, { align: 'center' });
       cursor += tLH;
+    }
+
+    // Deck label: tiny vertical edition tag along the right edge, so mixed
+    // printed decks can be sorted apart again. The left/right edges are the
+    // only bands the skylines and the centered stack never reach.
+    if (label) {
+      doc.setFont('Baloo2', 'semibold');
+      doc.setFontSize(7 * k * PT_PER_MM);
+      doc.setTextColor(...rgb('#8d8577'));
+      doc.text(label.toUpperCase(), x + cardMm - 6 * k, y + cardMm / 2, {
+        align: 'center',
+        angle: 90,
+        charSpace: 0.3 * k,
+      });
     }
   }
   return doc;

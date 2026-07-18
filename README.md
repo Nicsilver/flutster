@@ -46,7 +46,8 @@ Flutster runs on **your own** free Spotify developer credentials, so it works fo
 - Year verification: Spotify often reports a remaster or compilation date instead of the original release, so every card's year is checked against MusicBrainz, Discogs, and iTunes. Corrections apply automatically; anything uncertain is flagged for a quick review before you print.
 - Print tracking: the card maker remembers what you've already printed, shows what's new since the last print, filters the PDFs down to just those cards, and resurfaces printed cards whose year was later corrected.
 - Light and dark themes across app and web.
-- Deck sources: point the app at a deck-database URL or local file to resolve physical cards. You supply the source; the app bundles none.
+- Plays cards from other games too. If your cards' QR codes are not direct Spotify links (official Hitster-style decks encode a card number instead), point the app at a deck database that maps card numbers to tracks, via a URL or a local file, under Settings → Deck sources. Communities maintain such databases for the popular games; search for your gameset's card database. You supply the source; the app bundles none.
+- Optional deck label: a small tag printed along each card back's edge, so cards from different printed decks can be sorted apart when they get mixed.
 
 ## Download
 

@@ -173,6 +173,14 @@ export default function App() {
   const [printPop, setPrintPop] = useState(false);
   const [stripHidden, setStripHidden] = useState(false);
   const [yearsModal, setYearsModal] = useState(false);
+  // Optional per-deck edition tag printed tiny along each back's right edge.
+  const [deckLabels, setDeckLabels] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('flutster_decklabel') || '{}');
+    } catch {
+      return {};
+    }
+  });
   const [printedAll, setPrintedAll] = useState(loadPrinted);
   const [plKey, setPlKey] = useState('');
   const [printFilter, setPrintFilter] = useState(false);
@@ -248,7 +256,18 @@ export default function App() {
   const gapMm = 2; // auto — fixed gap between cards
   // "Cards per row" is the only size control; the card size (square) is derived to fit A4.
   const cardMm = Math.round(((A4_W - 2 * marginMm - (perRow - 1) * gapMm) / perRow) * 10) / 10;
-  const opts = { cardMm, marginMm, gapMm, cut, flip, style: cardStyle };
+  const deckLabel = (plKey && deckLabels[plKey]) || '';
+  function setDeckLabel(v) {
+    if (!plKey) return;
+    setDeckLabels((prev) => {
+      const next = { ...prev, [plKey]: v };
+      try {
+        localStorage.setItem('flutster_decklabel', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }
+  const opts = { cardMm, marginMm, gapMm, cut, flip, style: cardStyle, label: deckLabel.trim() };
   const grid = useMemo(() => estimatePerPage(opts), [cardMm, marginMm, gapMm]);
 
   const orderIdx =
@@ -933,6 +952,7 @@ export default function App() {
             cut={cut}
             hasPlaylist={!!playlist}
             cardStyle={cardStyle}
+            label={deckLabel.trim()}
           />
           <div className="st-a4cap">A4 · {grid.cols}×{grid.rows} grid · {cardMm} mm cards</div>
           <div className="st-setrow">
@@ -967,6 +987,18 @@ export default function App() {
               <option value="color">Colour</option>
               <option value="bw">B&W · ink saver</option>
             </select>
+          </div>
+          <div className="st-setrow">
+            <span>Deck label</span>
+            <input
+              className="st-lab"
+              placeholder="none"
+              maxLength={18}
+              value={deckLabel}
+              disabled={!playlist}
+              onChange={(e) => setDeckLabel(e.target.value)}
+              title="Tiny tag printed on each card back's edge, for telling mixed decks apart."
+            />
           </div>
           <div className="st-setrow">
             <span>Cap per year</span>
@@ -1418,7 +1450,7 @@ function RowYear({ t, onEdit, onKeep, done }) {
 }
 
 // Mini render of the real card design (155): double skyline, wide year pill.
-function CellBack({ t, cardStyle }) {
+function CellBack({ t, cardStyle, label }) {
   const { seed, palette } = cardColors(t.uri);
   const bw = cardStyle === 'bw';
   const pill = bw ? INK : palette[1];
@@ -1442,11 +1474,12 @@ function CellBack({ t, cardStyle }) {
       <b>{t.artist}</b>
       <i>{t.title}</i>
       {strip('b', seed)}
+      {label && <span className="cell-label">{label}</span>}
     </>
   );
 }
 
-function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist, cardStyle }) {
+function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist, cardStyle, label }) {
   const p = Math.max(0, page);
   const cells = Array.from({ length: grid.perPage }, (_, i) => tracks[p * grid.perPage + i] || null);
   const density = grid.cols >= 5 ? ' tiny' : grid.cols === 4 ? ' dense' : '';
@@ -1462,7 +1495,7 @@ function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut,
       >
         {cells.map((t, i) => (
           <div key={i} className={'sheet-cell' + (cut && (t || !hasPlaylist) ? ' cut' : '')}>
-            {t && <CellBack t={t} cardStyle={cardStyle} />}
+            {t && <CellBack t={t} cardStyle={cardStyle} label={label} />}
           </div>
         ))}
       </div>
