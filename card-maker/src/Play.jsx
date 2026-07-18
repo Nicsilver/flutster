@@ -8,6 +8,11 @@ import { findPreviewUrl } from './previews.js';
 // song plays with the answer hidden, like the phone app. Two sources:
 // previews (30s iTunes clips, no accounts) and Spotify (full songs on the
 // user's active device; needs the main page's login + Premium).
+//
+// Previews play through WebAudio (fetch -> decodeAudioData -> buffer source)
+// rather than an <audio> element: the clips are served as audio/x-m4p, which
+// some media pipelines refuse to even probe, while decodeAudioData handles
+// them fine. Suspending the AudioContext doubles as a pause clock.
 export default function PlayScreen({ token, onExit }) {
   // scan | resolving | tap | playing | miss | error
   const [phase, setPhase] = useState('scan');
@@ -19,48 +24,50 @@ export default function PlayScreen({ token, onExit }) {
   const [sec, setSec] = useState(0);
   const [camErr, setCamErr] = useState('');
   const videoRef = useRef(null);
-  const audioRef = useRef(null);
+  const engineRef = useRef(null); // { ctx, buf, src, startedAt }
   const busyRef = useRef(false);
   const uriRef = useRef('');
-
-  if (!audioRef.current && typeof Audio !== 'undefined') {
-    // Loop: a 30s clip should keep going while the table argues about a year.
-    const a = new Audio();
-    a.loop = true;
-    audioRef.current = a;
-  }
 
   function pickSource(s) {
     setSource(s);
     localStorage.setItem('flutster_playsrc', s);
   }
 
-  // audio.play()'s promise stays pending while the clip buffers, so waiting on
-  // it can hang forever on a slow connection. Settle on events instead:
-  // 'playing' wins, an autoplay rejection means one tap is needed, and a media
-  // error or 15s of silence is a failure.
-  function startClip(url) {
-    return new Promise((resolve) => {
-      const a = audioRef.current;
-      let done = false;
-      const finish = (v) => {
-        if (done) return;
-        done = true;
-        a.removeEventListener('playing', onOk);
-        a.removeEventListener('error', onBad);
-        clearTimeout(t);
-        resolve(v);
-      };
-      const onOk = () => finish('playing');
-      const onBad = () => finish('error');
-      a.addEventListener('playing', onOk);
-      a.addEventListener('error', onBad);
-      const t = setTimeout(() => finish('error'), 15000);
-      a.src = url;
-      a.play()
-        .then(() => finish('playing'))
-        .catch((e) => finish(e.name === 'NotAllowedError' ? 'tap' : 'error'));
-    });
+  async function loadClip(url) {
+    const buf = await Promise.race([
+      fetch(url).then((r) => {
+        if (!r.ok) throw new Error('CLIP');
+        return r.arrayBuffer();
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('CLIP')), 15000)),
+    ]);
+    const ctx =
+      engineRef.current?.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    const audioBuf = await ctx.decodeAudioData(buf);
+    engineRef.current = { ctx, buf: audioBuf, src: null, startedAt: 0 };
+  }
+
+  function startSrc(offset = 0) {
+    const e = engineRef.current;
+    if (!e) return;
+    try {
+      e.src?.stop();
+    } catch {}
+    const src = e.ctx.createBufferSource();
+    src.buffer = e.buf;
+    src.loop = true;
+    src.connect(e.ctx.destination);
+    src.start(0, offset % e.buf.duration);
+    e.src = src;
+    e.startedAt = e.ctx.currentTime - offset;
+  }
+
+  function stopSrc() {
+    const e = engineRef.current;
+    try {
+      e?.src?.stop();
+    } catch {}
+    if (e) e.src = null;
   }
 
   async function onScan(text) {
@@ -86,13 +93,19 @@ export default function PlayScreen({ token, onExit }) {
           busyRef.current = false;
           return;
         }
-        const res = await startClip(url);
-        if (res === 'playing') setPhase('playing');
-        else if (res === 'tap') setPhase('tap');
-        else {
-          setMsg('The preview clip failed to load. Check your connection and rescan.');
-          setPhase('error');
+        await loadClip(url);
+        startSrc(0);
+        const ctx = engineRef.current.ctx;
+        if (ctx.state === 'suspended') {
+          // Autoplay policy: the context only starts after a user gesture.
+          await ctx.resume().catch(() => {});
+          if (ctx.state === 'suspended') {
+            setPhase('tap');
+            busyRef.current = false;
+            return;
+          }
         }
+        setPhase('playing');
       }
     } catch (e) {
       setMsg(
@@ -104,7 +117,7 @@ export default function PlayScreen({ token, onExit }) {
           ? 'Spotify login expired. Log in again from the card maker, then come back.'
           : e.message === 'META'
           ? 'Could not identify this card. Check your connection and rescan.'
-          : 'Something went wrong. Rescan the card.'
+          : 'The clip failed to load. Check your connection and rescan.'
       );
       setPhase('error');
     }
@@ -172,12 +185,17 @@ export default function PlayScreen({ token, onExit }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, source, token]);
 
-  // Stopwatch while playing.
+  // Stopwatch while playing. The AudioContext clock freezes on suspend, so
+  // preview position stays honest through pauses for free.
   useEffect(() => {
     if (phase !== 'playing') return;
     const t = setInterval(() => {
-      if (source === 'preview' && audioRef.current) setSec(audioRef.current.currentTime);
-      else setSec((s) => (paused ? s : s + 0.5));
+      const e = engineRef.current;
+      if (source === 'preview' && e?.buf) {
+        setSec(Math.max(0, (e.ctx.currentTime - e.startedAt) % e.buf.duration));
+      } else {
+        setSec((s) => (paused ? s : s + 0.5));
+      }
     }, 500);
     return () => clearInterval(t);
   }, [phase, paused, source]);
@@ -190,10 +208,12 @@ export default function PlayScreen({ token, onExit }) {
     };
   });
 
-  // Always stop the music when the screen unmounts.
+  // Silence and release the audio pipeline when the screen unmounts.
   useEffect(() => {
     return () => {
-      audioRef.current?.pause();
+      stopSrc();
+      engineRef.current?.ctx.close().catch(() => {});
+      engineRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -202,8 +222,8 @@ export default function PlayScreen({ token, onExit }) {
     if (source === 'spotify' && token) {
       paused ? resumePlayback(token).catch(() => {}) : pausePlayback(token);
     } else {
-      const a = audioRef.current;
-      paused ? a.play().catch(() => {}) : a.pause();
+      const e = engineRef.current;
+      if (e) paused ? e.ctx.resume().catch(() => {}) : e.ctx.suspend().catch(() => {});
     }
     setPaused(!paused);
   }
@@ -213,9 +233,8 @@ export default function PlayScreen({ token, onExit }) {
       seekPlayback(0, token);
       if (paused) resumePlayback(token).catch(() => {});
     } else {
-      const a = audioRef.current;
-      a.currentTime = 0;
-      if (paused) a.play().catch(() => {});
+      startSrc(0);
+      if (paused) engineRef.current?.ctx.resume().catch(() => {});
     }
     setSec(0);
     setPaused(false);
@@ -223,9 +242,8 @@ export default function PlayScreen({ token, onExit }) {
 
   function guess() {
     if (source === 'spotify' && token) pausePlayback(token);
-    const a = audioRef.current;
-    a.pause();
-    a.removeAttribute('src');
+    stopSrc();
+    engineRef.current?.ctx.resume().catch(() => {});
     setPhase('scan');
   }
 
@@ -285,7 +303,7 @@ export default function PlayScreen({ token, onExit }) {
           <button
             className="tap-play"
             onClick={() => {
-              audioRef.current.play().catch(() => {});
+              engineRef.current?.ctx.resume().catch(() => {});
               setPhase('playing');
             }}
           >
