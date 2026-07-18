@@ -1215,6 +1215,10 @@ export default function App() {
           onKeep={(t) => ackTracks([t])}
           onUnkeep={unackTrack}
           onKeepAll={(list) => ackTracks(list)}
+          onJson={() => {
+            setReviewOpen(false);
+            setYearsModal(true);
+          }}
           onClose={() => setReviewOpen(false)}
         />
       )}
@@ -1622,7 +1626,7 @@ function rowSentence(t) {
 // Review modal: one row per flagged card — Spotify's claim, our guess with the
 // reason it's flagged, the year that will print (editable), and a Google
 // lookup. Rows stay put as they're resolved so nothing jumps underfoot.
-function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepAll, onClose }) {
+function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepAll, onJson, onClose }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -1671,6 +1675,14 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
                 : 'All resolved — this deck is ready to print.'
               : `${open.length} of ${tracks.length} left${checking ? ' · still checking, more may appear' : ''}`}
           </span>
+          <p className="rvm-json">
+            Many to fix?{' '}
+            <button className="linkbtn" onClick={onJson} disabled={checking}>
+              Export the years as JSON
+            </button>{' '}
+            and let an AI correct them in one batch
+            {checking ? ' — wait for the check to finish first.' : '.'}
+          </p>
         </div>
         <div className="rvm-body" ref={bodyRef}>
           {ordered.map((t) => {
