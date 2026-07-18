@@ -577,7 +577,7 @@ export default function App() {
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
-        setError('Session expired — please log in again.');
+        setError('Session expired. Please log in again.');
       } else {
         setError(e.message);
       }
@@ -650,7 +650,7 @@ export default function App() {
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
-        setError('Session expired — please log in again.');
+        setError('Session expired. Please log in again.');
       } else {
         setError(e.message);
       }
@@ -788,7 +788,7 @@ export default function App() {
           </div>
           <p className="paste-tip">
             <b>Tip:</b> copy songs in Spotify (Ctrl+A, Ctrl+C) and paste them <b>anywhere</b> on
-            this page — a deck starts building right away.
+            this page. A deck starts building right away.
           </p>
           {error && <p className="error">{error}</p>}
           {inPreview ? (
@@ -974,7 +974,7 @@ export default function App() {
                     )}
                   </div>
                   <p className="vhint">
-                    Old songs take a while — this runs in the background, so keep arranging your deck.
+                    Old songs take a while. This runs in the background, so keep arranging your deck.
                     Already-checked songs are instant next time.
                   </p>
                 </div>
@@ -983,7 +983,7 @@ export default function App() {
                 <div className="vstrip warn">
                   <div className="vrow">
                     <span className="vtitle">
-                      Years checked — <b className="vwarn">{flagged.length} need your eyes</b>
+                      Years checked · <b className="vwarn">{flagged.length} need your eyes</b>
                     </span>
                     <span className="vhint inline">
                       {verif.fixed > 0 && <>{verif.fixed} corrected · </>}
@@ -1031,7 +1031,7 @@ export default function App() {
                   </div>
                   {staleN > 0 && (
                     <p className="vhint">
-                      Changed = a year was corrected after you printed — those physical cards carry the wrong year.
+                      Changed = a year was corrected after you printed. Those physical cards carry the wrong year.
                     </p>
                   )}
                 </div>
@@ -1091,7 +1091,7 @@ export default function App() {
                       {tag && (
                         <span
                           className={'cap-tag' + (ps === 'stale' && state === 'in' ? ' rp' : '') + (ps ? ' ct-btn' : '')}
-                          title={ps ? 'Take the printed mark off — the card queues for a reprint.' : undefined}
+                          title={ps ? 'Take the printed mark off. The card queues for a reprint.' : undefined}
                           onClick={
                             ps
                               ? (e) => {
@@ -1321,7 +1321,7 @@ function SpotifyGate({ clientId, authError, onSaveId, onChangeId, onBack, onPrev
           </div>
           <p className="hint cid-hint">
             Stored only in this browser. No developer app handy?{' '}
-            <button className="linkbtn" onClick={onPreview}>Try Preview mode instead</button> — no
+            <button className="linkbtn" onClick={onPreview}>Try Preview mode instead</button>. No
             accounts needed.
           </p>
         </div>
@@ -1345,7 +1345,7 @@ function SpotifyGate({ clientId, authError, onSaveId, onChangeId, onBack, onPrev
             <summary>Login not working?</summary>
             <p>
               Your Spotify app must list this exact Redirect URI:{' '}
-              <CopyCode text={redirectUri()} /> — and your account must be added under Users and
+              <CopyCode text={redirectUri()} />, and your account must be added under Users and
               Access in the{' '}
               <a className="link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">
                 Spotify dashboard
@@ -1374,7 +1374,7 @@ function Shell({ children, action, narrow, wide, isDark }) {
       </header>
       {children}
       <footer>
-        Cards encode a <code>spotify:track</code> URI — scan them in Flutster. Personal use.
+        Cards encode a <code>spotify:track</code> URI. Scan them in Flutster. Personal use.
       </footer>
     </div>
   );
@@ -1474,13 +1474,13 @@ function YearTag({ t, onEdit }) {
   const srcName = { mb: 'MusicBrainz', it: 'iTunes', dg: 'Discogs' }[t.ysrc] || t.ysrc;
   const title =
     t.ysrc === 'edit'
-      ? 'Edited by you — click to change.'
+      ? 'Edited by you. Click to change.'
       : corrected
-      ? `Spotify said ${t.year0} — corrected via ${srcName}${t.unsure ? ' (uncertain: sources disagree)' : ''}. Click to edit.`
+      ? `Spotify said ${t.year0}, corrected via ${srcName}${t.unsure ? ' (uncertain: sources disagree)' : ''}. Click to edit.`
       : t.unv
-      ? 'Could not verify this year — click to edit.'
+      ? 'Could not verify this year. Click to edit.'
       : t.unsure
-      ? 'Uncertain — sources disagree on this year. Click to edit.'
+      ? 'Uncertain: sources disagree on this year. Click to edit.'
       : 'Click to edit the year.';
   return (
     <span
@@ -1492,7 +1492,7 @@ function YearTag({ t, onEdit }) {
         setEditing(true);
       }}
     >
-      {t.year || '—'}
+      {t.year || '?'}
       {corrected && <s>{t.year0}</s>}
     </span>
   );
@@ -1595,30 +1595,44 @@ function rowSentence(t) {
     );
   }
   if (t.unv) {
-    return (
+    // Preview-mode decks have no Spotify baseline year, so there is nothing
+    // to "keep": the card simply has no year until the user types one.
+    return y0 ? (
       <>
-        Not found anywhere — Spotify's <b>{y0 || '—'}</b> stays unless you fix it
+        Not found anywhere. Spotify's <b>{y0}</b> stays unless you fix it
       </>
+    ) : (
+      <>No source found a year. Type one in, or the card prints without it</>
     );
   }
   if (!t.ysrc) {
-    return (
+    return y0 ? (
       <>
-        Nothing backs Spotify's <b>{t.year}</b> — sources point later
+        Nothing backs Spotify's <b>{t.year}</b>. Sources point later
       </>
+    ) : (
+      <>No trusted source confirms this year</>
     );
   }
   const src = SRC_NAMES[t.ysrc] || t.ysrc;
   if (t.ysrc === 'it') {
-    return (
+    return y0 ? (
       <>
         Spotify says <s>{y0}</s> · iTunes guesses <b>{t.year}</b>, low confidence
       </>
+    ) : (
+      <>
+        iTunes guesses <b>{t.year}</b>, low confidence
+      </>
     );
   }
-  return (
+  return y0 ? (
     <>
       Spotify says <s>{y0}</s> · only {src} disagrees with <b>{t.year}</b>
+    </>
+  ) : (
+    <>
+      Only {src} found a year: <b>{t.year}</b>. No second source confirms it
     </>
   );
 }
@@ -1671,8 +1685,8 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
           <span className="rvm-sub">
             {open.length === 0
               ? checking
-                ? 'All resolved so far — still checking, more may appear.'
-                : 'All resolved — this deck is ready to print.'
+                ? 'All resolved so far. Still checking, more may appear.'
+                : 'All resolved. This deck is ready to print.'
               : `${open.length} of ${tracks.length} left${checking ? ' · still checking, more may appear' : ''}`}
           </span>
           <p className="rvm-json">
@@ -1681,7 +1695,7 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
               Export the years as JSON
             </button>{' '}
             and let an AI correct them in one batch
-            {checking ? ' — wait for the check to finish first.' : '.'}
+            {checking ? '. Wait for the check to finish first.' : '.'}
           </p>
         </div>
         <div className="rvm-body" ref={bodyRef}>
@@ -1706,7 +1720,7 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
                   </div>
                 </div>
                 {done ? (
-                  <span className="rvr-kept">{t.year || '—'}</span>
+                  <span className="rvr-kept">{t.year || '?'}</span>
                 ) : (
                   <RowYear t={t} onEdit={onEdit} onKeep={onKeep} done={done} />
                 )}
@@ -1716,7 +1730,7 @@ function ReviewModal({ tracks, checking, acks, onEdit, onKeep, onUnkeep, onKeepA
                     t.ysrc === 'edit'
                       ? 'Resolved by your edit'
                       : done
-                      ? 'Marked correct — click to unmark'
+                      ? 'Marked correct. Click to unmark'
                       : 'Mark this year as correct'
                   }
                   aria-label={`Mark year for ${t.title} as correct`}
@@ -1799,7 +1813,7 @@ function CellBack({ t, cardStyle }) {
     <>
       {!minimal && strip('t', seed + 4)}
       <span className={'yr yrpill' + (minimal ? ' plain' : '')} style={{ background: minimal ? 'transparent' : pill }}>
-        {t.year || '—'}
+        {t.year || '?'}
       </span>
       <b>{t.artist}</b>
       <i>{t.title}</i>

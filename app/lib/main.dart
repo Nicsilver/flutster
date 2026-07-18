@@ -1530,7 +1530,7 @@ class _DeckSourcesScreenState extends State<DeckSourcesScreen> {
             padding: const EdgeInsets.all(16),
             child: Text(
               "Add a deck-database URL to resolve physical cards to songs. Flutster "
-              "ships no deck data — search the web for your card game's card / gameset "
+              "ships no deck data. Search the web for your card game's card / gameset "
               "database (a public JSON file) and paste its URL. With none added, you can "
               "still scan cards you make in the card maker.",
               style: Theme.of(context).textTheme.bodySmall,

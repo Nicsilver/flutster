@@ -201,7 +201,7 @@ export async function makeBacksPdf(tracks, opts) {
 
     // The wide banner pill with white numerals. Minimal style skips the fill
     // and prints bare ink digits — the pill is the biggest ink sink on a card.
-    const yearStr = String(t.year || '—');
+    const yearStr = String(t.year || '?');
     doc.setFontSize((minimal ? 27 : 24) * k * PT_PER_MM);
     if (minimal) {
       doc.setTextColor(...rgb(INK));
