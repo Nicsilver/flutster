@@ -43,6 +43,36 @@ export default {
     };
     if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
 
+    // Deck-database passthrough for the /play page: user-supplied JSON URLs
+    // (e.g. the official Hitster gameset database) don't send CORS headers,
+    // so browsers can't read them directly. JSON-only and edge-cached, so
+    // this can't act as a general page proxy.
+    if (url.pathname === '/db') {
+      let target;
+      try {
+        target = new URL(url.searchParams.get('u') || '');
+      } catch {
+        return json({ error: 'bad-url' }, 400, cors);
+      }
+      if (target.protocol !== 'https:') return json({ error: 'https-only' }, 400, cors);
+      const upstream = await fetch(target.toString(), {
+        headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0' },
+        cf: { cacheTtl: 60 * 60 * 24, cacheEverything: true },
+      });
+      if (!upstream.ok) return json({ error: 'upstream-' + upstream.status }, 502, cors);
+      const body = await upstream.text();
+      const head = body.trimStart().slice(0, 1);
+      if (head !== '{' && head !== '[') return json({ error: 'not-json' }, 415, cors);
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=86400',
+          ...cors,
+        },
+      });
+    }
+
     const m = url.pathname.match(/^\/track\/([A-Za-z0-9]{22})$/);
     if (!m) return json({ error: 'not-found' }, 404, cors);
     const id = m[1];

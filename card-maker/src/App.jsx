@@ -734,17 +734,14 @@ export default function App() {
   ) : null;
 
   const playBtn = (
-    <button className="ghost sm" onClick={() => { window.location.hash = '#play'; }} title="Scan cards and play, right here in the browser">
-      ▶ Play
+    <button className="ghost sm playlink" onClick={() => { window.location.hash = '#play'; }} title="Scan cards and play, right here in the browser">
+      <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z" /></svg>
+      Play
     </button>
   );
 
   if (route === '#play') {
-    return (
-      <Shell isDark={theme.isDark} action={themeBtn}>
-        <PlayScreen token={token} onExit={() => { window.location.hash = ''; }} />
-      </Shell>
-    );
+    return <PlayScreen token={token} onExit={() => { window.location.hash = ''; }} />;
   }
 
   if (!mode) {
