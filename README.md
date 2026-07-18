@@ -61,6 +61,7 @@ Preview mode exists because Spotify has paused new developer app signups: withou
 - Year verification: Spotify often reports a remaster or compilation date instead of the original release, so every card's year is checked against MusicBrainz, Discogs, and iTunes. Corrections apply automatically; anything uncertain is flagged for a quick review before you print.
 - Print tracking: the card maker remembers what you've already printed, shows what's new since the last print, filters the PDFs down to just those cards, and resurfaces printed cards whose year was later corrected.
 - Light and dark themes across app and web.
+- Play in any browser, no app: [nicsilver.github.io/flutster/#play](https://nicsilver.github.io/flutster/#play) scans cards with the camera and plays them blind. 30 second preview clips with no accounts, or full songs on your active Spotify device when you are logged in. Works on phones and laptops, which also covers iPhone players.
 - Plays cards from other games too. If your cards' QR codes are not direct Spotify links (official Hitster-style decks encode a card number instead), point the app at a deck database that maps card numbers to tracks, via a URL or a local file, under Settings → Deck sources. Communities maintain such databases for the popular games; search for your gameset's card database. You supply the source; the app bundles none.
 - Optional deck label: a small tag printed along each card back's edge, so cards from different printed decks can be sorted apart when they get mixed.
 
