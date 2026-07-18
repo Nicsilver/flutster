@@ -715,38 +715,17 @@ export default function App() {
     );
   }
 
-  if (!inPreview && !clientId) {
+  if (!inPreview && (!clientId || !token)) {
     return (
       <Shell narrow isDark={theme.isDark} action={<>{themeBtn}{modeBtn}</>}>
-        <SetupClientId onSaved={(id) => { setClientId(id); setCid(id); }} />
-      </Shell>
-    );
-  }
-
-  if (!inPreview && !token) {
-    return (
-      <Shell
-        narrow
-        isDark={theme.isDark}
-        action={<>{themeBtn}{modeBtn}<button className="ghost sm" onClick={() => { setClientId(''); setCid(''); }}>Change ID</button></>}
-      >
-        <section className="hero fade-in">
-          <span className="pill">Spotify · QR · print at home</span>
-          <h2 className="hero-title">Turn a playlist into a card game.</h2>
-          <p className="lead">
-            Double-sided Flutster cards — QR codes on the front, year · artist · title
-            on the back — ready to print and cut.
-          </p>
-          {authError && <p className="error">{authError}</p>}
-          <button className="primary big" onClick={login}>
-            <span className="sp-dot" /> Log in with Spotify
-          </button>
-          <p className="hint">
-            First time? Add this redirect URI in your{' '}
-            <a className="link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">Spotify dashboard</a>:{' '}
-            <CopyCode text={redirectUri()} />
-          </p>
-        </section>
+        <SpotifyGate
+          clientId={clientId}
+          authError={authError}
+          onSaveId={(id) => { setClientId(id); setCid(id); }}
+          onChangeId={() => { setClientId(''); setCid(''); }}
+          onBack={() => setMode('')}
+          onPreview={() => setMode('preview')}
+        />
       </Shell>
     );
   }
@@ -1225,33 +1204,129 @@ export default function App() {
 function ModeChooser({ onPick }) {
   return (
     <section className="hero fade-in modes">
-      <span className="pill">Two ways to build a deck</span>
-      <h2 className="hero-title">How do you want to play?</h2>
+      <span className="pill">QR fronts · verified years on the backs · print at home</span>
+      <h2 className="hero-title">Turn a playlist into a card game.</h2>
+      <p className="lead">
+        Both modes make the exact same printable cards. Pick what fits you, switch anytime from
+        the top bar.
+      </p>
       <div className="mode-cards">
-        <button className="mode-card" onClick={() => onPick('spotify')}>
-          <b>Spotify mode</b>
-          <span className="mode-tag">Full songs · needs setup</span>
-          <p>
-            Uses your own free Spotify developer app: pick any of your playlists in one click, get
-            the richest song data, and play full songs through Spotify with the Flutster phone app.
-            Needs Spotify Premium.
-          </p>
-          <p className="mode-note">
-            Heads up: Spotify has paused new developer app signups, so right now this path needs an
-            app you already created.
-          </p>
-        </button>
-        <button className="mode-card" onClick={() => onPick('preview')}>
-          <b>Preview mode</b>
-          <span className="mode-tag">No accounts · 30s previews</span>
-          <p>
-            Zero setup. Copy songs from any Spotify playlist and paste them in. Years get verified
-            the same way, every card is matched to a 30 second preview clip, and the printed cards
-            come out identical to Spotify mode.
-          </p>
-          <p className="mode-note">You can switch modes anytime from the top bar.</p>
-        </button>
+        <div className="mode-card" onClick={() => onPick('spotify')}>
+          <div className="mode-head">
+            <b>Spotify mode</b>
+            <span className="mode-tag">Full songs</span>
+          </div>
+          <ul className="mode-feats">
+            <li>Your own playlists, loaded in one click</li>
+            <li>Full songs through Spotify in the Flutster phone app</li>
+            <li>The richest song data for year checking</li>
+            <li>Uses your own free Spotify developer app + Premium</li>
+          </ul>
+          <span className="mode-note">
+            Spotify has paused new developer signups, so this path currently needs an app you
+            already created.
+          </span>
+          <button className="primary mode-cta" onClick={(e) => { e.stopPropagation(); onPick('spotify'); }}>
+            Choose Spotify mode
+          </button>
+        </div>
+        <div className="mode-card" onClick={() => onPick('preview')}>
+          <div className="mode-head">
+            <b>Preview mode</b>
+            <span className="mode-tag hot">No accounts</span>
+          </div>
+          <ul className="mode-feats">
+            <li>Zero setup, start building right now</li>
+            <li>Paste songs copied from any Spotify playlist</li>
+            <li>Years verified against MusicBrainz, Discogs, and iTunes</li>
+            <li>Playback via 30 second preview clips</li>
+          </ul>
+          <span className="mode-note">The printed cards come out identical to Spotify mode.</span>
+          <button className="primary mode-cta" onClick={(e) => { e.stopPropagation(); onPick('preview'); }}>
+            Start with Preview mode
+          </button>
+        </div>
       </div>
+    </section>
+  );
+}
+
+// One screen for the whole Spotify-mode doorway: setup when no Client ID is
+// stored, an inviting login when one is.
+function SpotifyGate({ clientId, authError, onSaveId, onChangeId, onBack, onPreview }) {
+  const [v, setV] = useState('');
+  const save = () => v.trim() && onSaveId(v.trim());
+  const mask = (id) => (id.length <= 8 ? id : `${id.slice(0, 4)}…${id.slice(-4)}`);
+  return (
+    <section className="fade-in spgate">
+      <button className="backlink" onClick={onBack}>‹ All modes</button>
+      {!clientId ? (
+        <div className="sp-panel">
+          <div className="sp-strip" aria-hidden="true" />
+          <span className="pill">Spotify mode · one-time setup, about 3 minutes</span>
+          <h2>Use your own Spotify app</h2>
+          <p className="lead">
+            The card maker runs on a free Spotify developer app you create yourself, so nothing is
+            shared and nobody else&rsquo;s limits apply.
+          </p>
+          <ol className="setup-steps">
+            <li>Open <a className="link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com/dashboard</a> and press <b>Create app</b>.</li>
+            <li>Add this <b>Redirect URI</b> exactly: <CopyCode text={redirectUri()} /></li>
+            <li>Under APIs, tick <b>Web API</b>.</li>
+            <li>In <b>Users and Access</b>, add your own Spotify account.</li>
+            <li>Copy the app&rsquo;s <b>Client ID</b> and paste it below.</li>
+          </ol>
+          <div className="setup-save">
+            <label className="cid-field">
+              <span className="cid-label">Spotify Client ID</span>
+              <input
+                className="cid-input"
+                placeholder="Paste your 32-character Client ID"
+                value={v}
+                autoFocus
+                onChange={(e) => setV(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && save()}
+              />
+            </label>
+            <button className="primary cid-save" disabled={!v.trim()} onClick={save}>
+              Save &amp; continue
+            </button>
+          </div>
+          <p className="hint cid-hint">
+            Stored only in this browser. No developer app handy?{' '}
+            <button className="linkbtn" onClick={onPreview}>Try Preview mode instead</button> — no
+            accounts needed.
+          </p>
+        </div>
+      ) : (
+        <div className="sp-panel sp-login">
+          <div className="sp-strip" aria-hidden="true" />
+          <h2>Spotify mode</h2>
+          <p className="lead">Log in and your playlists load straight into the deck builder.</p>
+          {authError && <p className="error">{authError}</p>}
+          <button className="primary big" onClick={login}>
+            <span className="sp-dot" /> Log in with Spotify
+          </button>
+          <div className="sp-meta">
+            <span>
+              App: <code>{mask(clientId)}</code>
+            </span>
+            <button className="linkbtn" onClick={onChangeId}>Change ID</button>
+            <button className="linkbtn" onClick={onPreview}>Use Preview mode instead</button>
+          </div>
+          <details className="sp-help">
+            <summary>Login not working?</summary>
+            <p>
+              Your Spotify app must list this exact Redirect URI:{' '}
+              <CopyCode text={redirectUri()} /> — and your account must be added under Users and
+              Access in the{' '}
+              <a className="link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">
+                Spotify dashboard
+              </a>.
+            </p>
+          </details>
+        </div>
+      )}
     </section>
   );
 }
@@ -1756,41 +1831,3 @@ function CopyCode({ text }) {
   );
 }
 
-function SetupClientId({ onSaved }) {
-  const [v, setV] = useState('');
-  const save = () => v.trim() && onSaved(v.trim());
-  return (
-    <section className="hero fade-in setup">
-      <span className="pill">One-time setup · ~3 min</span>
-      <h2 className="hero-title">Use your own Spotify app</h2>
-      <p className="lead">
-        The card maker runs on your own free Spotify developer app, so it works just
-        for you — nothing shared, no accounts to trust.
-      </p>
-      <ol className="setup-steps">
-        <li>Open <a className="link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com/dashboard</a> and press <b>Create app</b>.</li>
-        <li>Add this <b>Redirect URI</b> exactly: <CopyCode text={redirectUri()} /></li>
-        <li>Under APIs, tick <b>Web API</b>.</li>
-        <li>In <b>Users and Access</b>, add your own Spotify account.</li>
-        <li>Copy the app's <b>Client ID</b> and paste it below.</li>
-      </ol>
-      <div className="setup-save">
-        <label className="cid-field">
-          <span className="cid-label">Spotify Client ID</span>
-          <input
-            className="cid-input"
-            placeholder="Paste your 32-character Client ID"
-            value={v}
-            autoFocus
-            onChange={(e) => setV(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-          />
-        </label>
-        <button className="primary cid-save" disabled={!v.trim()} onClick={save}>
-          Save &amp; continue
-        </button>
-      </div>
-      <p className="hint cid-hint">Stored only in this browser — you can change it anytime from the top-right.</p>
-    </section>
-  );
-}
