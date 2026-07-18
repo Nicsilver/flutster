@@ -922,12 +922,12 @@ export default function App() {
                   )}
                 </span>
                 <span className="grow" />
-                <button className="primary" onClick={() => download('fronts')} disabled={!!busy}>
-                  {busy === 'fronts' ? 'Building…' : 'Fronts · QR'}
+                <button className="primary alt" onClick={() => download('fronts')} disabled={!!busy}>
+                  {busy === 'fronts' ? 'Building…' : 'Fronts PDF'}
                 </button>
                 <span className="printwrap">
                   <button
-                    className="primary alt"
+                    className="primary spectrum"
                     disabled={!!busy}
                     onClick={() => {
                       if (printPop) return setPrintPop(false);
@@ -935,7 +935,7 @@ export default function App() {
                       download('backs');
                     }}
                   >
-                    {busy === 'backs' ? 'Building…' : 'Backs · answers'}
+                    {busy === 'backs' ? 'Building…' : 'Backs PDF'}
                     {flagged.length > 0 && <span className="flagbadge">{flagged.length}</span>}
                   </button>
                   {nudge && !printPop && (

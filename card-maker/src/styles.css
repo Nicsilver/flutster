@@ -144,6 +144,8 @@ button { font-family: inherit; border: 0; cursor: pointer; font-weight: 700; tra
 .primary.big { padding: 15px 30px; font-size: 17px; border-radius: 12px; display: inline-flex; align-items: center; gap: 10px; }
 .primary.alt { background: var(--panel); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--tile-shadow); }
 .primary.alt:hover:not(:disabled) { opacity: 1; background: var(--active); }
+.primary.spectrum { position: relative; overflow: hidden; }
+.primary.spectrum::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--spectrum); }
 button:disabled { opacity: 0.4; cursor: default; }
 .ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 9px 16px; font-size: 14px; }
 .ghost:hover { color: var(--ink); }
