@@ -106,6 +106,19 @@ function loadAcks() {
   }
 }
 
+// Printed ledger: which cards have physically been printed, per playlist,
+// stored as uri → the year the card carried when it was printed. A later
+// year correction makes the entry stale ("changed since print") so the
+// card resurfaces as needing a reprint.
+const PRINTED_KEY = 'flutster_printed';
+function loadPrinted() {
+  try {
+    return JSON.parse(localStorage.getItem(PRINTED_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
 // Songs-per-year stats used by the timeline strip.
 function yearStats(tracks) {
   const years = tracks.map((t) => t.year).filter((y) => y > 0);
@@ -159,6 +172,13 @@ export default function App() {
   const [reviewUris, setReviewUris] = useState([]);
   const [printPop, setPrintPop] = useState(false);
   const [stripHidden, setStripHidden] = useState(false);
+  const [printedAll, setPrintedAll] = useState(loadPrinted);
+  const [plKey, setPlKey] = useState('');
+  const [printFilter, setPrintFilter] = useState(false);
+  const [nudge, setNudge] = useState(false);
+  // Which card set each PDF was last downloaded for — when fronts and backs
+  // match, the user plausibly printed, and the mark-as-printed nudge shows.
+  const dlRef = useRef({ fronts: '', backs: '', set: [] });
   const verifRun = useRef(0);
   const verifCtrl = useRef(null);
   const playlistRef = useRef(null);
@@ -249,7 +269,23 @@ export default function App() {
       return orderPos.get(a._idx) - orderPos.get(b._idx);
     });
   const included = ordered.filter((t) => !excluded.has(t._idx));
-  const tracks = capOn ? capPerYear(included, Math.max(1, capN || 1)) : included;
+  // Print tracking: an entry with the current year = printed, an entry with a
+  // different year = stale (the physical card is wrong), no entry = new.
+  const printedCards = (plKey && printedAll[plKey]?.cards) || {};
+  let printedN = 0;
+  let staleN = 0;
+  for (const t of included) {
+    const py = printedCards[t.uri];
+    if (py == null) continue;
+    printedN++;
+    if (py !== t.year) staleN++;
+  }
+  const newN = included.length - printedN;
+  const toPrintN = newN + staleN;
+  const printable = printFilter
+    ? included.filter((t) => printedCards[t.uri] !== t.year)
+    : included;
+  const tracks = capOn ? capPerYear(printable, Math.max(1, capN || 1)) : printable;
   // Cards whose year still needs a human: uncertain or unfound, not manually
   // edited, and not acknowledged in the review modal.
   const flagged = playlist
@@ -379,6 +415,22 @@ export default function App() {
     });
   }
 
+  function markPrinted(pairs) {
+    if (!plKey) return;
+    setPrintedAll((prev) => {
+      const cards = { ...(prev[plKey]?.cards || {}) };
+      for (const [uri, y] of pairs) cards[uri] = y;
+      const next = { ...prev, [plKey]: { ts: Date.now(), cards } };
+      try {
+        localStorage.setItem(PRINTED_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setNudge(false);
+    // Marking means printing is done — back to the full deck view.
+    setPrintFilter(false);
+  }
+
   function openReview() {
     setPrintPop(false);
     setReviewUris(flagged.map((t) => t.uri));
@@ -402,6 +454,10 @@ export default function App() {
       setOrder(data.tracks.map((_, i) => i));
       setExcluded(new Set());
       setSheetPage(0);
+      setPlKey(id || data.name);
+      setPrintFilter(false);
+      setNudge(false);
+      dlRef.current = { fronts: '', backs: '', set: [] };
       if (id) setFp(id, count ?? -1, fingerprint(data.tracks));
       startVerify(data, id, count);
     } catch (e) {
@@ -451,6 +507,16 @@ export default function App() {
           : await makeBacksPdf(tracks, opts);
       const safe = playlist.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
       doc.save(`flutster-${safe}-${kind}.pdf`);
+      const sig = tracks.map((t) => t.uri).join(',');
+      const dl = dlRef.current;
+      dl[kind] = sig;
+      dl.set = tracks.map((t) => [t.uri, t.year]);
+      if (dl.fronts === sig && dl.backs === sig && plKey) {
+        // Never auto-mark — a test sheet must not poison the ledger. Only
+        // nudge, and only when the set holds anything unmarked or stale.
+        const pc = loadPrinted()[plKey]?.cards || {};
+        if (dl.set.some(([u, y]) => pc[u] !== y)) setNudge(true);
+      }
     } finally {
       setBusy('');
     }
@@ -571,6 +637,23 @@ export default function App() {
                     {busy === 'backs' ? 'Building…' : 'Backs · answers'}
                     {flagged.length > 0 && <span className="flagbadge">{flagged.length}</span>}
                   </button>
+                  {nudge && !printPop && (
+                    <div className="printpop">
+                      <b>Printed these for real?</b>
+                      <p>
+                        You downloaded fronts and backs for {dlRef.current.set.length} cards.
+                        Mark them printed and they&rsquo;ll drop out of &ldquo;new&rdquo;.
+                      </p>
+                      <div className="printpop-row">
+                        <button className="primary sm-cta" onClick={() => markPrinted(dlRef.current.set)}>
+                          Mark {dlRef.current.set.length} printed
+                        </button>
+                        <button className="ghost sm" onClick={() => setNudge(false)}>
+                          Not yet
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {printPop && (
                     <div className="printpop">
                       <b>{flagged.length} year{flagged.length !== 1 ? 's' : ''} still flagged</b>
@@ -644,6 +727,36 @@ export default function App() {
                 </div>
               )}
 
+              {(printFilter || (printedN > 0 && toPrintN > 0)) && (
+                <div className="vstrip pstrip">
+                  <div className="vrow">
+                    <span className="vtitle">
+                      {printedN} printed · <b className="pnew">{newN} new</b>
+                      {staleN > 0 && <> · <b className="pstale">{staleN} changed since print</b></>}
+                    </span>
+                    <span className="pbar" aria-hidden="true">
+                      <i style={{ width: `${(Math.max(0, printedN - staleN) / Math.max(1, included.length)) * 100}%` }} />
+                      <em style={{ width: `${(toPrintN / Math.max(1, included.length)) * 100}%` }} />
+                    </span>
+                    <button className="primary vreview" onClick={() => setPrintFilter((v) => !v)}>
+                      {printFilter ? `Show all ${included.length}` : `Show the ${toPrintN} to print`}
+                    </button>
+                    <button
+                      className="ghost sm"
+                      disabled={tracks.length === 0}
+                      onClick={() => markPrinted(tracks.map((t) => [t.uri, t.year]))}
+                    >
+                      Mark {tracks.length} printed
+                    </button>
+                  </div>
+                  {staleN > 0 && (
+                    <p className="vhint">
+                      Changed = a year was corrected after you printed — those physical cards carry the wrong year.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <TimelineStrip tracks={tracks} />
 
               <div className="backs-head">
@@ -659,9 +772,23 @@ export default function App() {
               <div className="backs-preview">
                 {ordered.map((t) => {
                   const state = excluded.has(t._idx) ? 'excluded' : finalSet.has(t._idx) ? 'in' : 'over';
+                  const py = printedCards[t.uri];
+                  const ps = state === 'excluded' || py == null ? '' : py === t.year ? 'printed' : 'stale';
+                  const tag =
+                    state === 'excluded'
+                      ? 'off'
+                      : state === 'over'
+                      ? printFilter && ps === 'printed'
+                        ? 'printed'
+                        : 'over cap'
+                      : ps === 'stale'
+                      ? 'reprint · year changed'
+                      : ps === 'printed'
+                      ? 'printed'
+                      : null;
                   return (
                     <div
-                      className={`pcard ${decClass(t.year)} ${state}`}
+                      className={`pcard ${decClass(t.year)} ${state}${ps ? ` ${ps}` : ''}`}
                       key={t._idx}
                       onClick={() => toggleCard(t._idx)}
                       title="Include / exclude"
@@ -669,7 +796,7 @@ export default function App() {
                       <YearTag t={t} onEdit={editYear} />
                       <b>{t.artist}</b>
                       <i>{t.title}</i>
-                      {state !== 'in' && <span className="cap-tag">{state === 'over' ? 'over cap' : 'off'}</span>}
+                      {tag && <span className={'cap-tag' + (ps === 'stale' && state === 'in' ? ' rp' : '')}>{tag}</span>}
                     </div>
                   );
                 })}

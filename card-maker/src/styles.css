@@ -316,6 +316,16 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
   animation: vspin 1s linear infinite;
 }
 @keyframes vspin { to { transform: rotate(360deg); } }
+
+/* Print tracking: strip, two-segment printed/new bar, card tags */
+.vstrip.pstrip { border-color: color-mix(in srgb, var(--dec60) 45%, var(--line)); }
+.vtitle .pnew { color: var(--dec60); }
+.vtitle .pstale { color: var(--dec70); }
+.pbar { flex: 1; min-width: 120px; height: 6px; border-radius: 999px; background: var(--active); overflow: hidden; display: flex; }
+.pbar i { display: block; height: 100%; background: var(--dec90); transition: width 0.4s ease; }
+.pbar em { display: block; height: 100%; background: var(--dec60); transition: width 0.4s ease; }
+.pcard.printed { opacity: 0.5; }
+.cap-tag.rp { background: var(--dec70); color: #fff; }
 @media (prefers-reduced-motion: reduce) { .vspin { animation: none; } }
 .vreview { background: var(--dec70) !important; }
 .primary.sm-cta { padding: 8px 15px; font-size: 12px; flex: none; }
