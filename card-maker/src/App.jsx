@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, fetchTracks, parseTrackIds, redirectUri, getClientId, setClientId, parsePlaylistId } from './spotify.js';
 import { verifyYears, saveOverride, plausibleYear } from './years.js';
 import { checkPreviews } from './previews.js';
+import { fetchPastedTracks, deckKey, loadSavedDecks, saveDeck } from './meta.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
 import { cardColors, rz, INK } from './cardstyle.js';
 
@@ -155,6 +156,12 @@ function useTheme() {
 }
 
 export default function App() {
+  // Spotify mode (BYO developer app, full API) vs Preview mode (no accounts:
+  // pasted links + metadata mirror + iTunes preview clips). Empty = not
+  // chosen yet, which shows the mode chooser.
+  const [mode, setModeState] = useState(() => localStorage.getItem('flutster_mode') || '');
+  const inPreview = mode === 'preview';
+  const [savedDecks, setSavedDecks] = useState(loadSavedDecks);
   const [clientId, setCid] = useState(getClientId());
   const [token, setToken] = useState(null);
   const [authError, setAuthError] = useState('');
@@ -546,7 +553,10 @@ export default function App() {
       dlRef.current = { fronts: '', backs: '', set: [] };
       if (id) setFp(id, count ?? -1, fingerprint(data.tracks));
       startVerify(data, id, count);
-      startPreviewCheck(data);
+      // Preview availability only matters in Preview mode: Spotify-mode
+      // decks play through Spotify itself.
+      prevCtrl.current?.abort();
+      setPrevMiss(new Set());
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
@@ -554,6 +564,46 @@ export default function App() {
       } else {
         setError(e.message);
       }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function setMode(m) {
+    localStorage.setItem('flutster_mode', m);
+    setModeState(m);
+    setPlaylist(null);
+    setSelectedId('');
+    setError('');
+    setRailQuery('');
+    prevCtrl.current?.abort();
+    setPrevMiss(new Set());
+  }
+
+  async function onLoadPasted(ids) {
+    setError('');
+    setPlaylist(null);
+    setLoading(true);
+    setSelectedId('');
+    try {
+      const data = await fetchPastedTracks(ids);
+      if (data.tracks.length === 0) throw new Error('Could not resolve any of those track links.');
+      data.name = `Pasted ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · ${data.tracks.length} songs`;
+      const k = deckKey(data.tracks.map((t) => t.id));
+      setSavedDecks(saveDeck(k, data.name, data.tracks.map((t) => t.id)));
+      if (data.failed > 0) setError(`${data.failed} link${data.failed !== 1 ? 's' : ''} could not be resolved and got skipped.`);
+      setPlaylist(data);
+      setOrder(data.tracks.map((_, i) => i));
+      setExcluded(new Set());
+      setSheetPage(0);
+      setPlKey('p:' + k);
+      setPrintFilter(false);
+      setNudge(false);
+      dlRef.current = { fronts: '', backs: '', set: [] };
+      startVerify(data, null, null);
+      startPreviewCheck(data);
+    } catch (e) {
+      setError(e.message === 'META' ? 'The metadata mirror is unreachable right now. Try again in a minute.' : e.message);
     } finally {
       setLoading(false);
     }
@@ -578,7 +628,8 @@ export default function App() {
       setNudge(false);
       dlRef.current = { fronts: '', backs: '', set: [] };
       startVerify(data, null, null);
-      startPreviewCheck(data);
+      prevCtrl.current?.abort();
+      setPrevMiss(new Set());
     } catch (e) {
       if (e.message === 'AUTH') {
         setToken(null);
@@ -646,21 +697,38 @@ export default function App() {
       {theme.isDark ? 'Light' : 'Dark'}
     </button>
   );
+  const modeBtn = mode ? (
+    <button
+      className="ghost sm"
+      title={inPreview ? 'Switch to Spotify mode' : 'Switch to Preview mode (no accounts)'}
+      onClick={() => setMode(inPreview ? 'spotify' : 'preview')}
+    >
+      {inPreview ? 'Mode: Preview' : 'Mode: Spotify'}
+    </button>
+  ) : null;
 
-  if (!clientId) {
+  if (!mode) {
     return (
       <Shell narrow isDark={theme.isDark} action={themeBtn}>
+        <ModeChooser onPick={setMode} />
+      </Shell>
+    );
+  }
+
+  if (!inPreview && !clientId) {
+    return (
+      <Shell narrow isDark={theme.isDark} action={<>{themeBtn}{modeBtn}</>}>
         <SetupClientId onSaved={(id) => { setClientId(id); setCid(id); }} />
       </Shell>
     );
   }
 
-  if (!token) {
+  if (!inPreview && !token) {
     return (
       <Shell
         narrow
         isDark={theme.isDark}
-        action={<>{themeBtn}<button className="ghost sm" onClick={() => { setClientId(''); setCid(''); }}>Change ID</button></>}
+        action={<>{themeBtn}{modeBtn}<button className="ghost sm" onClick={() => { setClientId(''); setCid(''); }}>Change ID</button></>}
       >
         <section className="hero fade-in">
           <span className="pill">Spotify · QR · print at home</span>
@@ -684,29 +752,71 @@ export default function App() {
   }
 
   return (
-    <Shell wide isDark={theme.isDark} action={<>{themeBtn}<button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button></>}>
+    <Shell
+      wide
+      isDark={theme.isDark}
+      action={
+        <>
+          {themeBtn}
+          {modeBtn}
+          {!inPreview && <button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button>}
+        </>
+      }
+    >
       <div className="studio fade-in">
-        {/* LEFT — playlists */}
+        {/* LEFT — playlists (Spotify mode) or saved pasted decks (Preview mode) */}
         <aside className="st-rail">
-          <div className="st-rh">Playlists{myLists.length > 0 && <span className="badge">{myLists.length}</span>}</div>
+          <div className="st-rh">
+            {inPreview ? (
+              <>Pasted decks{savedDecks.length > 0 && <span className="badge">{savedDecks.length}</span>}</>
+            ) : (
+              <>Playlists{myLists.length > 0 && <span className="badge">{myLists.length}</span>}</>
+            )}
+          </div>
           <div className="st-search">
             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"/></svg>
             <input
-              placeholder="Search, or paste a link or tracks…"
+              placeholder={inPreview ? 'Paste songs copied from Spotify…' : 'Search, or paste a link or tracks…'}
               value={railQuery}
               onChange={(e) => setRailQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && isLink) onLoad(railQuery); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && isLink && !inPreview) onLoad(railQuery); }}
               onPaste={(e) => {
                 const ids = parseTrackIds(e.clipboardData?.getData('text') || '');
                 if (ids.length > 0) {
                   e.preventDefault();
                   setRailQuery('');
-                  onLoadTracks(ids);
+                  (inPreview ? onLoadPasted : onLoadTracks)(ids);
                 }
               }}
             />
           </div>
           {error && <p className="error">{error}</p>}
+          {inPreview ? (
+            <div className="st-pllist">
+              {savedDecks.length === 0 && (
+                <p className="hint">
+                  Open a playlist in Spotify, select the songs (Ctrl+A), copy (Ctrl+C), and paste them
+                  above. Decks you build are remembered here.
+                </p>
+              )}
+              {savedDecks
+                .filter((d) => !q || d.name.toLowerCase().includes(q))
+                .map((d) => (
+                  <button
+                    key={d.k}
+                    className={'st-plrow' + (playlist && plKey === 'p:' + d.k ? ' active' : '')}
+                    onClick={() => onLoadPasted(d.ids)}
+                    title={d.name}
+                  >
+                    <div className="st-plc"><span>♪</span></div>
+                    <div className="st-plmeta">
+                      <b>{d.name}</b>
+                      <span>{d.ids.length} tracks</span>
+                    </div>
+                  </button>
+                ))}
+            </div>
+          ) : (
           <div className="st-pllist">
             {loadingLists && <p className="hint">Loading your playlists…</p>}
             {!loadingLists && shownLists.length === 0 && (
@@ -728,6 +838,7 @@ export default function App() {
               </button>
             ))}
           </div>
+          )}
         </aside>
 
         {/* MIDDLE — action row, timeline, deck */}
@@ -737,10 +848,41 @@ export default function App() {
           ) : !playlist ? (
             <div className="st-empty">
               <div className="st-empty-ic">🎴</div>
-              <p>
-                Pick a playlist on the left, paste a playlist link, or select songs in Spotify
-                (Ctrl+A, Ctrl+C) and paste them into the search box.
-              </p>
+              {inPreview ? (
+                <>
+                  <p>
+                    Open any Spotify playlist, select the songs (Ctrl+A), copy (Ctrl+C), and paste
+                    them into the box on the left.
+                  </p>
+                  <div className="pv-how">
+                    <b>How Preview mode works</b>
+                    <ol>
+                      <li>
+                        Your pasted links are turned into song titles and artists through a small
+                        public metadata mirror. No account, no login, nothing stored anywhere but
+                        this browser.
+                      </li>
+                      <li>
+                        Every release year is verified against MusicBrainz, Discogs, and iTunes,
+                        the same pipeline Spotify mode uses.
+                      </li>
+                      <li>
+                        Every song is matched to a 30 second iTunes preview clip. The few without
+                        one get a &ldquo;no preview&rdquo; tag so you can decide before printing.
+                      </li>
+                      <li>
+                        The printed cards are identical to Spotify-mode cards, so they also scan
+                        in the Flutster app.
+                      </li>
+                    </ol>
+                  </div>
+                </>
+              ) : (
+                <p>
+                  Pick a playlist on the left, paste a playlist link, or select songs in Spotify
+                  (Ctrl+A, Ctrl+C) and paste them into the search box.
+                </p>
+              )}
             </div>
           ) : (
             <>
@@ -1077,6 +1219,40 @@ export default function App() {
         />
       )}
     </Shell>
+  );
+}
+
+function ModeChooser({ onPick }) {
+  return (
+    <section className="hero fade-in modes">
+      <span className="pill">Two ways to build a deck</span>
+      <h2 className="hero-title">How do you want to play?</h2>
+      <div className="mode-cards">
+        <button className="mode-card" onClick={() => onPick('spotify')}>
+          <b>Spotify mode</b>
+          <span className="mode-tag">Full songs · needs setup</span>
+          <p>
+            Uses your own free Spotify developer app: pick any of your playlists in one click, get
+            the richest song data, and play full songs through Spotify with the Flutster phone app.
+            Needs Spotify Premium.
+          </p>
+          <p className="mode-note">
+            Heads up: Spotify has paused new developer app signups, so right now this path needs an
+            app you already created.
+          </p>
+        </button>
+        <button className="mode-card" onClick={() => onPick('preview')}>
+          <b>Preview mode</b>
+          <span className="mode-tag">No accounts · 30s previews</span>
+          <p>
+            Zero setup. Copy songs from any Spotify playlist and paste them in. Years get verified
+            the same way, every card is matched to a 30 second preview clip, and the printed cards
+            come out identical to Spotify mode.
+          </p>
+          <p className="mode-note">You can switch modes anytime from the top bar.</p>
+        </button>
+      </div>
+    </section>
   );
 }
 

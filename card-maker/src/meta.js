@@ -1,7 +1,7 @@
 // Preview-mode metadata: pasted track ids resolve to { title, artist } via
 // the credential-free Cloudflare mirror (see worker/meta-worker.js). Results
 // cache locally and at the mirror's edge, so reloading a deck costs nothing.
-const WORKER = 'https://flutster-meta.WORKER_SUBDOMAIN.workers.dev';
+const WORKER = 'https://flutster-meta.nic-silver.workers.dev';
 const KEY = 'flutster_meta'; // { [trackId]: [title, artist] }
 
 let mem = null;

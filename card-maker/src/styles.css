@@ -348,6 +348,34 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .yjm-res { font-size: 12.5px; font-weight: 700; color: var(--dec90); }
 .yjm-err { font-size: 12.5px; font-weight: 700; color: var(--dec70); }
 
+/* Mode chooser + Preview-mode explainer */
+.modes .hero-title { margin-bottom: 30px; }
+.mode-cards { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.mode-card {
+  flex: 1 1 240px; max-width: 300px; text-align: left; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 20px 22px; box-shadow: var(--tile-shadow); font-family: inherit; color: var(--ink);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.mode-card:hover { transform: translateY(-2px); border-color: var(--muted); }
+.mode-card b { display: block; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.mode-tag {
+  display: inline-block; margin: 7px 0 11px; padding: 3px 10px; border-radius: 999px;
+  background: var(--active); border: 1px solid var(--line);
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em;
+}
+.mode-card p { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 0 0 10px; }
+.mode-card .mode-note { font-size: 12px; margin-bottom: 0; }
+.pv-how {
+  margin-top: 22px; text-align: left; max-width: 480px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 16px 20px; box-shadow: var(--tile-shadow);
+}
+.pv-how b { font-size: 14px; }
+.pv-how ol { margin: 10px 0 0; padding-left: 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.pv-how li { margin-bottom: 7px; }
+.pv-how li:last-child { margin-bottom: 0; }
+
 /* Deck label: rail input + tiny vertical tag on sheet-preview backs */
 .st-lab {
   width: 110px; padding: 6px 9px; font-family: inherit; font-size: 12.5px; font-weight: 600;

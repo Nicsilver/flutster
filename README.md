@@ -17,6 +17,21 @@ It has two parts:
 
 Flutster runs on **your own** free Spotify developer credentials, so it works for you and your friends with nothing shared, no accounts, and no servers. It ships **no** song data.
 
+## Two modes
+
+The card maker offers two ways to build a deck, chosen on first visit and switchable from the top bar:
+
+| | **Spotify mode** | **Preview mode** |
+|---|---|---|
+| Setup | Your own free Spotify developer app + Premium | None |
+| Input | Your playlists, playlist links, or pasted songs | Songs copied from any Spotify playlist (Ctrl+A, Ctrl+C, paste) |
+| Song data | Full Spotify metadata incl. ISRC | Title and artist via a small public metadata mirror |
+| Year verification | MusicBrainz, Discogs, iTunes | The same |
+| Playback | Full songs through Spotify (Flutster app) | 30-second iTunes preview clips; cards without one are tagged before you print |
+| Printed cards | Identical in both modes | Identical in both modes |
+
+Preview mode exists because Spotify has paused new developer app signups: without a developer app you cannot use Spotify mode, but you can still build, verify, and print a full deck with zero accounts. The metadata mirror is a tiny [Cloudflare Worker](card-maker/worker/meta-worker.js) that only reads public Spotify pages and holds no credentials of any kind.
+
 ## Screenshots
 
 <p align="center">
