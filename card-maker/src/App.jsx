@@ -333,6 +333,23 @@ export default function App() {
       return add.length ? [...prev, ...add] : prev;
     });
   }, [reviewOpen, flagged]);
+  // Paste songs anywhere on the page — not just the search box. Re-registered
+  // every render so the handler never closes over stale mode/token state.
+  useEffect(() => {
+    const onGlobalPaste = (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (!mode) return;
+      if (!inPreview && !token) return;
+      const ids = parseTrackIds(e.clipboardData?.getData('text') || '');
+      if (ids.length === 0) return;
+      e.preventDefault();
+      (inPreview ? onLoadPasted : onLoadTracks)(ids);
+    };
+    window.addEventListener('paste', onGlobalPaste);
+    return () => window.removeEventListener('paste', onGlobalPaste);
+  });
+
   // The all-clear strip shows briefly, then gets out of the way.
   useEffect(() => {
     if (verif && !verif.running && flagged.length === 0 && !stripHidden) {
@@ -769,6 +786,10 @@ export default function App() {
               }}
             />
           </div>
+          <p className="paste-tip">
+            <b>Tip:</b> copy songs in Spotify (Ctrl+A, Ctrl+C) and paste them <b>anywhere</b> on
+            this page — a deck starts building right away.
+          </p>
           {error && <p className="error">{error}</p>}
           {inPreview ? (
             <div className="st-pllist">

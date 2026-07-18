@@ -348,6 +348,14 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .yjm-res { font-size: 12.5px; font-weight: 700; color: var(--dec90); }
 .yjm-err { font-size: 12.5px; font-weight: 700; color: var(--dec70); }
 
+/* Paste-anywhere tip in the rail */
+.paste-tip {
+  margin: 10px 2px 12px; padding: 9px 11px; border-radius: 10px;
+  border: 1px dashed var(--line); background: var(--field);
+  color: var(--muted); font-size: 12px; line-height: 1.5;
+}
+.paste-tip b { color: var(--ink); }
+
 /* Mode chooser + Preview-mode explainer */
 .modes .lead { margin-bottom: 34px; }
 .mode-cards { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
