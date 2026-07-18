@@ -1267,7 +1267,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _createPage() {
+    const amber = Color(0xFFE3A008);
     return _pageShell('Step 1 of 4', 'Create your Spotify app', [
+      // Same warning the card maker's chooser carries: without an existing
+      // developer app this whole setup is a dead end right now.
+      Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: amber.withValues(alpha: 0.13),
+          border: Border.all(color: amber.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text.rich(
+          TextSpan(children: [
+            const TextSpan(
+              text: 'Currently locked for new users. ',
+              style: TextStyle(
+                  fontWeight: FontWeight.w800, color: Color(0xFFE8590C)),
+            ),
+            TextSpan(
+              text: 'This setup needs a free "developer app" made in '
+                  'Spotify\'s dashboard, and Spotify is not letting anyone '
+                  'create new ones right now. If you never made one, tap '
+                  '"Skip · play with previews" above instead: cards play 30 '
+                  'second preview clips, no accounts needed.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ]),
+        ),
+      ),
       Text(
         'Flutster plays music through your own free Spotify developer app, so it '
         'works for you and your friends. One-time setup, about 3 minutes.',
