@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, redirectUri, getClientId, setClientId, parsePlaylistId } from './spotify.js';
+import { login, logout, handleRedirect, fetchPlaylist, fetchMyPlaylists, fetchTracks, parseTrackIds, redirectUri, getClientId, setClientId, parsePlaylistId } from './spotify.js';
 import { verifyYears, saveOverride, plausibleYear } from './years.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
 import { cardColors, rz, INK } from './cardstyle.js';
@@ -516,6 +516,37 @@ export default function App() {
     }
   }
 
+  async function onLoadTracks(ids) {
+    setError('');
+    setPlaylist(null);
+    setLoading(true);
+    setSelectedId('');
+    try {
+      const data = await fetchTracks(ids, token);
+      if (data.tracks.length === 0) throw new Error('No playable tracks in that paste.');
+      setPlaylist(data);
+      setOrder(data.tracks.map((_, i) => i));
+      setExcluded(new Set());
+      setSheetPage(0);
+      // All pasted decks share one print-ledger bucket; entries are keyed by
+      // track uri, so overlap across pastes is exactly what we want.
+      setPlKey('pasted');
+      setPrintFilter(false);
+      setNudge(false);
+      dlRef.current = { fronts: '', backs: '', set: [] };
+      startVerify(data, null, null);
+    } catch (e) {
+      if (e.message === 'AUTH') {
+        setToken(null);
+        setError('Session expired — please log in again.');
+      } else {
+        setError(e.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function choose(pl) {
     setSelectedId(pl.id);
     setUrl(pl.uri);
@@ -617,10 +648,18 @@ export default function App() {
           <div className="st-search">
             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"/></svg>
             <input
-              placeholder="Search or paste a link…"
+              placeholder="Search, or paste a link or tracks…"
               value={railQuery}
               onChange={(e) => setRailQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && isLink) onLoad(railQuery); }}
+              onPaste={(e) => {
+                const ids = parseTrackIds(e.clipboardData?.getData('text') || '');
+                if (ids.length > 0) {
+                  e.preventDefault();
+                  setRailQuery('');
+                  onLoadTracks(ids);
+                }
+              }}
             />
           </div>
           {error && <p className="error">{error}</p>}
@@ -654,7 +693,10 @@ export default function App() {
           ) : !playlist ? (
             <div className="st-empty">
               <div className="st-empty-ic">🎴</div>
-              <p>Pick a playlist on the left — or paste a link — to start building cards.</p>
+              <p>
+                Pick a playlist on the left, paste a playlist link, or select songs in Spotify
+                (Ctrl+A, Ctrl+C) and paste them into the search box.
+              </p>
             </div>
           ) : (
             <>

@@ -134,6 +134,45 @@ export function parsePlaylistId(url) {
   return m ? m[1] : null;
 }
 
+// Track IDs from pasted text. Spotify desktop puts one track URL per line on
+// the clipboard when you copy selected songs (Ctrl+A, Ctrl+C on a playlist);
+// bare spotify:track: URIs match too. Order preserved, duplicates dropped.
+export function parseTrackIds(text) {
+  const out = [];
+  const seen = new Set();
+  const re = /track[/:]([A-Za-z0-9]{22})/g;
+  let m;
+  while ((m = re.exec(String(text)))) {
+    if (!seen.has(m[1])) {
+      seen.add(m[1]);
+      out.push(m[1]);
+    }
+  }
+  return out;
+}
+
+export async function fetchTracks(ids, token) {
+  const tracks = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const page = await api(`/tracks?ids=${ids.slice(i, i + 50).join(',')}`, token);
+    for (const t of page.tracks || []) {
+      if (!t || !t.uri) continue;
+      if (!t.name && !(t.artists || []).some((a) => a.name)) continue;
+      const year = parseInt((t.album?.release_date || '').slice(0, 4), 10) || 0;
+      tracks.push({
+        uri: t.uri,
+        id: t.id,
+        title: t.name || '',
+        artist: (t.artists || []).map((a) => a.name).join(', '),
+        year,
+        isrc: t.external_ids?.isrc || '',
+        comp: t.album?.album_type === 'compilation',
+      });
+    }
+  }
+  return { name: `Pasted tracks (${tracks.length})`, tracks };
+}
+
 export async function fetchPlaylist(url, token) {
   const id = parsePlaylistId(url);
   if (!id) throw new Error('That is not a valid Spotify playlist link.');
