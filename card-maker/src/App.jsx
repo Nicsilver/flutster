@@ -172,6 +172,7 @@ export default function App() {
   const [reviewUris, setReviewUris] = useState([]);
   const [printPop, setPrintPop] = useState(false);
   const [stripHidden, setStripHidden] = useState(false);
+  const [yearsModal, setYearsModal] = useState(false);
   const [printedAll, setPrintedAll] = useState(loadPrinted);
   const [plKey, setPlKey] = useState('');
   const [printFilter, setPrintFilter] = useState(false);
@@ -444,6 +445,34 @@ export default function App() {
       } catch {}
       return next;
     });
+  }
+
+  // Import externally corrected years (e.g. the exported JSON run through an
+  // LLM). Matches by uri, falls back to artist+title; changed years land as
+  // regular pinned edits so they survive reloads like any manual fix.
+  function applyYearsJson(arr) {
+    const flat = (s) =>
+      String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+    const byUri = new Map(playlist.tracks.map((t) => [t.uri, t]));
+    const byKey = new Map(playlist.tracks.map((t) => [flat(t.artist) + '|' + flat(t.title), t]));
+    let updated = 0;
+    let same = 0;
+    let missed = 0;
+    for (const e of arr) {
+      const t = byUri.get(e.uri) || byKey.get(flat(e.artist) + '|' + flat(e.title));
+      const y = parseInt(e.year, 10);
+      if (!t || !plausibleYear(y)) {
+        missed++;
+        continue;
+      }
+      if (t.year === y) {
+        same++;
+        continue;
+      }
+      editYear(t.uri, y);
+      updated++;
+    }
+    return { updated, same, missed };
   }
 
   function openReview() {
@@ -777,6 +806,7 @@ export default function App() {
               <div className="backs-head">
                 <span className="mini-cap">Card backs</span>
                 <div className="backs-actions">
+                  <button className="st-tbtn" onClick={() => setYearsModal(true)}>Fix years · JSON</button>
                   <button className="st-tbtn" onClick={shuffle}>{SHUFFLE_ICON} Shuffle</button>
                   {excluded.size > 0 && (
                     <button className="st-tbtn" onClick={() => setExcluded(new Set())}>Reset</button>
@@ -912,6 +942,13 @@ export default function App() {
           </div>
         </aside>
       </div>
+      {yearsModal && playlist && (
+        <YearsJsonModal
+          tracks={playlist.tracks}
+          onApply={applyYearsJson}
+          onClose={() => setYearsModal(false)}
+        />
+      )}
       {reviewOpen && playlist && (
         <ReviewModal
           tracks={reviewUris.map((u) => playlist.tracks.find((t) => t.uri === u)).filter(Boolean)}
@@ -1065,6 +1102,83 @@ function YearTag({ t, onEdit }) {
       {t.year || '—'}
       {corrected && <s>{t.year0}</s>}
     </span>
+  );
+}
+
+// Export the deck as JSON for external year fixing (paste into an LLM, paste
+// the corrected array back). Tolerates sloppy pastes: grabs the first [...]
+// block so code fences or chat text around the JSON don't break the import.
+function YearsJsonModal({ tracks, onApply, onClose }) {
+  const [txt, setTxt] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const json = useMemo(
+    () =>
+      JSON.stringify(
+        tracks.map((t) => ({ uri: t.uri, artist: t.artist, title: t.title, year: t.year })),
+        null,
+        1
+      ),
+    [tracks]
+  );
+  const copy = () => {
+    navigator.clipboard?.writeText(json);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  const apply = () => {
+    setResult(null);
+    try {
+      const m = txt.match(/\[[\s\S]*\]/);
+      const arr = JSON.parse(m ? m[0] : txt);
+      if (!Array.isArray(arr)) throw new Error('not an array');
+      setErr('');
+      setResult(onApply(arr));
+    } catch {
+      setErr('Could not read that as JSON. Paste the full array, including the [ ].');
+    }
+  };
+  return (
+    <div className="rvm-back" onClick={onClose} role="dialog" aria-modal="true" aria-label="Fix years with JSON">
+      <div className="yjm" onClick={(e) => e.stopPropagation()}>
+        <h3>Fix years as JSON</h3>
+        <p>
+          Copy the deck as JSON and paste it into ChatGPT, Claude, or wherever you like, with a request such as
+          &ldquo;correct the release years to the original first release, not remasters or re-issues&rdquo;.
+          Then paste the corrected JSON below. Only changed years are applied, saved as your own edits.
+        </p>
+        <div className="yjm-row">
+          <button className="primary sm-cta" onClick={copy}>
+            {copied ? '✓ Copied' : `Copy ${tracks.length} tracks as JSON`}
+          </button>
+        </div>
+        <textarea
+          placeholder="Paste the corrected JSON here…"
+          value={txt}
+          onChange={(e) => setTxt(e.target.value)}
+          spellCheck={false}
+        />
+        <div className="yjm-row">
+          <button className="primary sm-cta" disabled={!txt.trim()} onClick={apply}>
+            Apply years
+          </button>
+          {result && (
+            <span className="yjm-res">
+              {result.updated} updated · {result.same} unchanged{result.missed > 0 && <> · {result.missed} not matched</>}
+            </span>
+          )}
+          {err && <span className="yjm-err">{err}</span>}
+          <span className="grow" />
+          <button className="ghost sm" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

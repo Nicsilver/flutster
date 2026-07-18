@@ -328,6 +328,25 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .cap-tag.rp { background: var(--dec70); color: #fff; }
 .cap-tag.ct-btn { cursor: pointer; }
 .cap-tag.ct-btn:hover { background: var(--dec70); color: #fff; }
+
+/* Years-as-JSON modal */
+.yjm {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  width: min(580px, 92vw); padding: 20px 22px; box-shadow: var(--sheet-shadow);
+}
+.yjm h3 { margin: 0 0 7px; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.yjm p { color: var(--muted); font-size: 13px; line-height: 1.55; margin: 0 0 6px; }
+.yjm textarea {
+  width: 100%; height: 150px; resize: vertical; margin-top: 12px;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: var(--field); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+.yjm textarea:focus { outline: none; border-color: var(--link); }
+.yjm-row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.yjm-row .grow { flex: 1; }
+.yjm-res { font-size: 12.5px; font-weight: 700; color: var(--dec90); }
+.yjm-err { font-size: 12.5px; font-weight: 700; color: var(--dec70); }
 @media (prefers-reduced-motion: reduce) { .vspin { animation: none; } }
 .vreview { background: var(--dec70) !important; }
 .primary.sm-cta { padding: 8px 15px; font-size: 12px; flex: none; }
