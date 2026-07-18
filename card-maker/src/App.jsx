@@ -521,7 +521,7 @@ export default function App() {
           ? await makeFrontsPdf(tracks, opts)
           : await makeBacksPdf(tracks, opts);
       const safe = playlist.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-      doc.save(`flutster-${safe}-${kind}.pdf`);
+      doc.save(`flutster-${safe}-${kind}-${cardStyle === 'bw' ? 'bw' : 'colour'}.pdf`);
       const sig = tracks.map((t) => t.uri).join(',');
       const dl = dlRef.current;
       dl[kind] = sig;
