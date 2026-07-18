@@ -26,6 +26,15 @@ Flutster runs on **your own** free Spotify developer credentials, so it works fo
   <img src="screenshots/app-settings.jpg" width="24%" alt="Settings">
 </p>
 
+<p align="center">
+  <img src="screenshots/web-studio.jpg" width="100%" alt="Card Maker: a loaded deck with decade timeline, card backs, and live A4 sheet preview">
+</p>
+
+<p align="center">
+  <img src="screenshots/web-print-tracking.jpg" width="49%" alt="Print tracking: printed, new, and changed-since-print cards">
+  <img src="screenshots/web-dark.jpg" width="49%" alt="Card Maker in dark theme">
+</p>
+
 ## Features
 
 - Opens straight to the camera. Point at a card and the song plays.
@@ -34,6 +43,8 @@ Flutster runs on **your own** free Spotify developer credentials, so it works fo
 - Saves songs you like to a private "Flutster Songs" playlist with one tap; tap again to remove.
 - Card Maker turns any playlist into printable double-sided cards: QR fronts, designed answer backs (each card gets its own colors, hashed from the track so nothing hints at the year), in colour or an ink-saving black and white.
 - A decade-colored timeline and per-playlist "era fingerprints" show a deck's balance before you print; a live sheet preview shows exactly what comes out of the printer.
+- Year verification: Spotify often reports a remaster or compilation date instead of the original release, so every card's year is checked against MusicBrainz, Discogs, and iTunes. Corrections apply automatically; anything uncertain is flagged for a quick review before you print.
+- Print tracking: the card maker remembers what you've already printed, shows what's new since the last print, filters the PDFs down to just those cards, and resurfaces printed cards whose year was later corrected.
 - Light and dark themes across app and web.
 - Deck sources: point the app at a deck-database URL or local file to resolve physical cards. You supply the source; the app bundles none.
 
