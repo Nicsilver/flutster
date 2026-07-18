@@ -31,14 +31,11 @@ async function json(url, signal) {
   return r.json();
 }
 
-// The search lane must stand alone: in no-Spotify-API mode there is no ISRC,
-// so it tries several query shapes before giving up. ISRC lookup, when an
-// ISRC exists, is an exact-recording shortcut on top.
+// Search-only on purpose: iTunes' lookup endpoint ignores the isrc parameter
+// (0 hits across a 79-track live probe), and the future no-Spotify-API mode
+// has no ISRCs anyway — so the search lane tries several query shapes and
+// storefronts before giving up. Probed hit rate on the real deck: ~96%.
 async function hasPreview(t, signal) {
-  if (t.isrc) {
-    const r = await json(`https://itunes.apple.com/lookup?isrc=${t.isrc}&entity=song&country=DK`, signal);
-    if ((r.results || []).some((x) => x.previewUrl)) return true;
-  }
   const artist = String(t.artist).split(',')[0];
   const title = String(t.title).split(' - ')[0].split(' (')[0];
   const fa = flat(artist);
