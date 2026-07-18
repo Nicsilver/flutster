@@ -5,6 +5,7 @@ import { checkPreviews } from './previews.js';
 import { fetchPastedTracks, deckKey, loadSavedDecks, saveDeck } from './meta.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
 import { cardColors, rz, INK } from './cardstyle.js';
+import PlayScreen from './Play.jsx';
 
 const A4_W = 210; // mm — page width drives the auto card size
 
@@ -159,6 +160,14 @@ export default function App() {
   // Spotify mode (BYO developer app, full API) vs Preview mode (no accounts:
   // pasted links + metadata mirror + iTunes preview clips). Empty = not
   // chosen yet, which shows the mode chooser.
+  // #play routes to the scan-and-play screen (hash routing survives GitHub
+  // Pages' lack of server rewrites).
+  const [route, setRoute] = useState(() => window.location.hash);
+  useEffect(() => {
+    const onHash = () => setRoute(window.location.hash);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const [mode, setModeState] = useState(() => localStorage.getItem('flutster_mode') || '');
   const inPreview = mode === 'preview';
   const [savedDecks, setSavedDecks] = useState(loadSavedDecks);
@@ -724,9 +733,23 @@ export default function App() {
     </button>
   ) : null;
 
-  if (!mode) {
+  const playBtn = (
+    <button className="ghost sm" onClick={() => { window.location.hash = '#play'; }} title="Scan cards and play, right here in the browser">
+      ▶ Play
+    </button>
+  );
+
+  if (route === '#play') {
     return (
       <Shell isDark={theme.isDark} action={themeBtn}>
+        <PlayScreen token={token} onExit={() => { window.location.hash = ''; }} />
+      </Shell>
+    );
+  }
+
+  if (!mode) {
+    return (
+      <Shell isDark={theme.isDark} action={<>{themeBtn}{playBtn}</>}>
         <ModeChooser onPick={setMode} />
       </Shell>
     );
@@ -754,6 +777,7 @@ export default function App() {
       action={
         <>
           {themeBtn}
+          {playBtn}
           {modeBtn}
           {!inPreview && <button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button>}
         </>

@@ -26,6 +26,20 @@ async function resolveOne(id) {
   return [j.title, j.artist || ''];
 }
 
+// Single-track lookup for the /play page's scanner.
+export async function resolveMeta(id) {
+  if (!mem) mem = load();
+  if (mem[id]) return { title: mem[id][0], artist: mem[id][1] };
+  try {
+    const hit = await resolveOne(id);
+    mem[id] = hit;
+    save();
+    return { title: hit[0], artist: hit[1] };
+  } catch {
+    return null;
+  }
+}
+
 // Resolves pasted ids into the track shape the rest of the app expects.
 // No ISRC and no Spotify year in this mode: the year verifier's search
 // lanes date every card from scratch.

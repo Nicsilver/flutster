@@ -32,16 +32,16 @@ async function json(url, signal) {
 }
 
 // Search-only on purpose: iTunes' lookup endpoint ignores the isrc parameter
-// (0 hits across a 79-track live probe), and the future no-Spotify-API mode
-// has no ISRCs anyway — so the search lane tries several query shapes and
+// (0 hits across a 79-track live probe), and the no-Spotify-API mode has no
+// ISRCs anyway — so the search lane tries several query shapes and
 // storefronts before giving up. Probed hit rate on the real deck: ~96%.
-async function hasPreview(t, signal) {
+async function clipUrl(t, signal) {
   const artist = String(t.artist).split(',')[0];
   const title = String(t.title).split(' - ')[0].split(' (')[0];
   const fa = flat(artist);
   const ft = flat(title);
   const match = (r) =>
-    (r.results || []).some(
+    (r.results || []).find(
       (x) =>
         x.previewUrl &&
         (flat(x.artistName).includes(fa) || fa.includes(flat(x.artistName))) &&
@@ -57,10 +57,22 @@ async function hasPreview(t, signal) {
       `https://itunes.apple.com/search?term=${encodeURIComponent(term.slice(0, 80))}&entity=song&limit=10&country=${country}`,
       signal
     );
-    if (match(r)) return true;
+    const hit = match(r);
+    if (hit) return hit.previewUrl;
     await new Promise((res) => setTimeout(res, 180));
   }
-  return false;
+  return null;
+}
+
+// The /play page needs the actual clip URL; scanned cards repeat within a
+// party, so remember them for the session.
+const urlMem = new Map();
+export async function findPreviewUrl(t, signal) {
+  const key = t.isrc || t.uri || `${t.artist}|${t.title}`;
+  if (urlMem.has(key)) return urlMem.get(key);
+  const url = await clipUrl(t, signal);
+  urlMem.set(key, url);
+  return url;
 }
 
 // onUpdate(uri, ok) fires for every track; cached tracks resolve instantly.
@@ -75,7 +87,7 @@ export async function checkPreviews(tracks, { signal, onUpdate } = {}) {
       continue;
     }
     try {
-      const ok = await hasPreview(t, signal);
+      const ok = !!(await findPreviewUrl(t, signal));
       mem[key] = ok ? 1 : 0;
       if (++dirty % 10 === 0) save();
       onUpdate?.(t.uri, ok);

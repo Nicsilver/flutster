@@ -1,4 +1,5 @@
-const SCOPES = 'playlist-read-private playlist-read-collaborative';
+// playback scope powers the /play page's full-song source.
+const SCOPES = 'playlist-read-private playlist-read-collaborative user-modify-playback-state';
 const AUTH_URL = 'https://accounts.spotify.com/authorize';
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 
@@ -133,6 +134,25 @@ export function parsePlaylistId(url) {
   const m = String(url).match(/playlist[/:]([A-Za-z0-9]+)/);
   return m ? m[1] : null;
 }
+
+// Playback control for the /play page: full songs on whatever Spotify device
+// the user has active. Distinct errors so the UI can explain each dead end.
+async function player(path, token, body) {
+  const resp = await fetch('https://api.spotify.com/v1/me/player' + path, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (resp.status === 404) throw new Error('NO_DEVICE');
+  if (resp.status === 403) throw new Error('PREMIUM');
+  if (resp.status === 401) throw new Error('AUTH');
+  if (!resp.ok && resp.status !== 204) throw new Error('SPOTIFY_' + resp.status);
+}
+
+export const playTrack = (uri, token) => player('/play', token, { uris: [uri] });
+export const resumePlayback = (token) => player('/play', token, undefined);
+export const pausePlayback = (token) => player('/pause', token, undefined).catch(() => {});
+export const seekPlayback = (ms, token) => player(`/seek?position_ms=${ms}`, token, undefined).catch(() => {});
 
 // Track IDs from pasted text. Spotify desktop puts one track URL per line on
 // the clipboard when you copy selected songs (Ctrl+A, Ctrl+C on a playlist);

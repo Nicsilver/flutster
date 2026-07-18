@@ -348,6 +348,69 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .yjm-res { font-size: 12.5px; font-weight: 700; color: var(--dec90); }
 .yjm-err { font-size: 12.5px; font-weight: 700; color: var(--dec70); }
 
+/* /play: scan-and-play screen */
+.play { max-width: 560px; margin: 0 auto; }
+.play-top { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.play-top .grow { flex: 1; }
+.play-src { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--field); }
+.src-pill {
+  border: none; background: none; padding: 7px 14px; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted);
+}
+.src-pill.on { background: var(--btn); color: var(--btn-fg); }
+.src-pill:disabled { opacity: 0.45; cursor: default; }
+.play-stage { text-align: center; }
+.play-stage.center { padding: 48px 0 20px; }
+.play-stage h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 18px 0 6px; }
+.cam-wrap {
+  position: relative; border-radius: 18px; overflow: hidden; background: #000;
+  aspect-ratio: 3 / 4; max-height: 62vh; margin: 0 auto;
+}
+.cam-wrap video { width: 100%; height: 100%; object-fit: cover; }
+.cam-frame {
+  position: absolute; top: 50%; left: 50%; width: 62%; aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 3px solid rgba(255, 255, 255, 0.75); border-radius: 22px;
+  pointer-events: none;
+}
+.play-hint { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 14px auto 0; max-width: 40ch; }
+.play-note {
+  width: 110px; height: 110px; margin: 0 auto; border-radius: 50%;
+  display: grid; place-items: center; font-size: 52px;
+  background: var(--active); border: 1px solid var(--line);
+}
+.play-note.off { opacity: 0.55; }
+.play-sub { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
+.play-time { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 18px 0 6px; }
+.play-ctl { display: flex; gap: 14px; justify-content: center; align-items: center; margin-bottom: 30px; }
+.ctl {
+  width: 76px; height: 76px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); font-size: 30px; cursor: pointer;
+  display: grid; place-items: center;
+}
+.ctl.sm { width: 54px; height: 54px; font-size: 24px; }
+.ctl:hover { background: var(--active); }
+.tap-play {
+  width: 120px; height: 120px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--btn); color: var(--btn-fg); font-size: 44px;
+  display: grid; place-items: center; margin: 0 auto;
+}
+.play-spin {
+  width: 54px; height: 54px; margin: 0 auto; border-radius: 50%;
+  border: 4px solid var(--active); border-top-color: var(--dec00);
+  animation: vspin 1s linear infinite;
+}
+.guess-btn {
+  position: relative; overflow: hidden; width: 100%; padding: 24px;
+  font-family: inherit; font-size: 24px; font-weight: 800; letter-spacing: 0.02em;
+  border: none; border-radius: 16px; background: var(--btn); color: var(--btn-fg);
+  cursor: pointer; margin-top: 6px;
+}
+.guess-btn::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+  background: var(--spectrum);
+}
+
 /* JSON-export pointer inside the review modal */
 .rvm-json { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; }
 .rvm-json .linkbtn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
