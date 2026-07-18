@@ -10,6 +10,7 @@ class AppSettings {
   static const _kClientId = 'spotify_client_id';
   static const _kDeckSources = 'deck_sources';
   static const _kExplored = 'explored_without_spotify';
+  static const _kUsePreviews = 'use_previews';
   static const _kThemeMode = 'theme_mode';
 
   final ValueNotifier<bool> start30 = ValueNotifier(false);
@@ -25,6 +26,11 @@ class AppSettings {
   // (and lets a store reviewer see it) without supplying Spotify credentials.
   final ValueNotifier<bool> explored = ValueNotifier(false);
 
+  // Force preview playback (30s iTunes clips) even when a Spotify app is
+  // configured. Without a Client ID previews are always used regardless.
+  final ValueNotifier<bool> usePreviews = ValueNotifier(false);
+  bool get previewMode => usePreviews.value || !hasClientId;
+
   // Deck-database sources: http(s) URLs or local file paths. The app ships none.
   final ValueNotifier<List<String>> deckSources = ValueNotifier(<String>[]);
 
@@ -34,8 +40,15 @@ class AppSettings {
     themeMode.value = p.getString(_kThemeMode) ?? 'system';
     clientId.value = p.getString(_kClientId) ?? '';
     explored.value = p.getBool(_kExplored) ?? false;
+    usePreviews.value = p.getBool(_kUsePreviews) ?? false;
     deckSources.value =
         (jsonDecode(p.getString(_kDeckSources) ?? '[]') as List).cast<String>();
+  }
+
+  Future<void> setUsePreviews(bool v) async {
+    usePreviews.value = v;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kUsePreviews, v);
   }
 
   Future<void> setExplored(bool v) async {

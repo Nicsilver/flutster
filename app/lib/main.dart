@@ -269,10 +269,10 @@ class _ScanHomeState extends State<ScanHome> {
     super.initState();
     // mobile_scanner 6+ no longer auto-starts the camera with the widget.
     unawaited(_controller.start());
-    if (AppSettings.instance.hasClientId) {
+    if (!AppSettings.instance.previewMode) {
       _connectSpotify();
     } else {
-      // No Spotify app configured = preview mode: cards play 30s iTunes clips.
+      // Preview mode (chosen, or no Spotify app configured): 30s iTunes clips.
       _spotifyOk = true;
       _spotifyStatus = 'Previews';
     }
@@ -326,8 +326,8 @@ class _ScanHomeState extends State<ScanHome> {
 
     if (track == null) {
       _snack('Card ${card!.id} isn\'t in the deck map yet.');
-    } else if (!AppSettings.instance.hasClientId) {
-      // Preview mode: no Spotify at all — resolve and play a 30s iTunes clip.
+    } else if (AppSettings.instance.previewMode) {
+      // Preview mode: no Spotify involved — resolve and play a 30s iTunes clip.
       await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => PreviewPlayingScreen(track: track),
       ));
@@ -353,7 +353,23 @@ class _ScanHomeState extends State<ScanHome> {
         MaterialPageRoute(builder: (_) => const SettingsScreen()),
       );
     }
-    if (mounted) await _controller.start();
+    if (!mounted) return;
+    // The mode may have been switched in Settings — refresh the chip and
+    // (re)connect Spotify if it's needed now.
+    if (AppSettings.instance.previewMode) {
+      setState(() {
+        _spotifyOk = true;
+        _spotifyStatus = 'Previews';
+      });
+    } else if (!_spotify.isConnected) {
+      _connectSpotify();
+    } else {
+      setState(() {
+        _spotifyOk = true;
+        _spotifyStatus = 'Spotify';
+      });
+    }
+    await _controller.start();
   }
 
   @override
@@ -937,11 +953,26 @@ class SettingsScreen extends StatelessWidget {
           ]),
           const _SettingsHeader('Playback'),
           _SettingsGroup(children: [
+            AnimatedBuilder(
+              animation: Listenable.merge([s.usePreviews, s.clientId]),
+              builder: (context, _) {
+                final forced = !s.hasClientId;
+                return SwitchListTile(
+                  title: const Text('Play 30 second previews'),
+                  subtitle: Text(forced
+                      ? 'Always on: no Spotify app is connected.'
+                      : 'iTunes preview clips instead of full songs through Spotify. No Premium needed.'),
+                  value: forced || s.usePreviews.value,
+                  onChanged: forced ? null : (v) => s.setUsePreviews(v),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
             ValueListenableBuilder<bool>(
               valueListenable: s.start30,
               builder: (context, value, _) => SwitchListTile(
                 title: const Text('Start songs 30 seconds in'),
-                subtitle: const Text('Skip the quiet intros.'),
+                subtitle: const Text('Skip the quiet intros. Spotify playback only.'),
                 value: value,
                 onChanged: (v) => s.setStart30(v),
               ),
