@@ -20,6 +20,8 @@ const ICONS = {
   close: 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
   gear: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
   note: 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z',
+  rew: 'M11 18V6l-8.5 6 8.5 6zm.5-6 8.5 6V6l-8.5 6z',
+  fwd: 'M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z',
 };
 
 function Icon({ d, size = 24 }) {
@@ -328,6 +330,14 @@ export default function PlayScreen({ token, onExit }) {
     setPaused(!paused);
   }
 
+  // Full songs only: the position clock is our own stopwatch, same
+  // extrapolation the app uses.
+  function seekBy(delta) {
+    const target = Math.max(0, sec + delta);
+    seekPlayback(Math.round(target * 1000), token);
+    setSec(target);
+  }
+
   function restart() {
     const p = playerRef.current;
     if (source === 'spotify' && token) {
@@ -455,9 +465,21 @@ export default function PlayScreen({ token, onExit }) {
                 <h2 className="play-big">Guess the year</h2>
                 {source === 'preview' && <p className="play-sub">30 second preview</p>}
                 <div className="play-time">{fmt(sec)}</div>
-                <button className="ctl" onClick={togglePause} aria-label={paused ? 'Play' : 'Pause'}>
-                  <Icon d={paused ? ICONS.play : ICONS.pause} size={44} />
-                </button>
+                <div className="play-row">
+                  {source === 'spotify' && token && (
+                    <button className="ctl side" onClick={() => seekBy(-15)} aria-label="Back 15 seconds" title="Back 15s">
+                      <Icon d={ICONS.rew} size={34} />
+                    </button>
+                  )}
+                  <button className="ctl" onClick={togglePause} aria-label={paused ? 'Play' : 'Pause'}>
+                    <Icon d={paused ? ICONS.play : ICONS.pause} size={44} />
+                  </button>
+                  {source === 'spotify' && token && (
+                    <button className="ctl side" onClick={() => seekBy(15)} aria-label="Forward 15 seconds" title="Forward 15s">
+                      <Icon d={ICONS.fwd} size={34} />
+                    </button>
+                  )}
+                </div>
                 <button className="play-restart" onClick={restart}>
                   <Icon d={ICONS.replay} size={22} /> Restart
                 </button>

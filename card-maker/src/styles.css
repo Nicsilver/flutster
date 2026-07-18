@@ -414,6 +414,8 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
   font-family: inherit; font-size: 16px; font-weight: 600; color: var(--ink);
 }
 .play-restart:hover { background: var(--active); }
+.play-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.ctl.side { width: 68px; height: 68px; }
 .play-foot { flex: none; }
 .tap-play {
   width: 120px; height: 120px; border-radius: 50%; border: none; cursor: pointer;
@@ -714,3 +716,40 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .toggle .thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--panel); transition: transform 0.18s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
 .toggle input:checked + .track { background: var(--dec90); }
 .toggle input:checked + .track .thumb { transform: translateX(16px); }
+
+/* Small screens: single-column studio with a scrollable playlist rail, a
+   capped sheet preview, and everything else given room to wrap. Kept at the
+   end of the file so these override the base rules above. */
+@media (max-width: 900px) {
+  .wrap { padding: 18px 14px 48px; }
+  .topbar { margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .top-actions { flex-wrap: wrap; }
+  .studio { gap: 24px; }
+  .st-pllist { max-height: 38vh; overflow-y: auto; }
+  .st-right { max-width: 360px; width: 100%; margin: 0 auto; }
+  .st-act { flex-wrap: wrap; gap: 10px; }
+  .st-act h2 { flex: 1 1 100%; white-space: normal; }
+  .hero { padding: 26px 6px 16px; }
+  .mode-cards { gap: 14px; }
+  .mode-card { max-width: none; }
+  .sp-panel { padding: 22px 18px; }
+  .sp-login { padding: 32px 18px 26px; }
+  .sp-meta { gap: 10px; }
+  .setup-save { flex-wrap: wrap; }
+  .rvm-head { padding: 12px 14px 9px; }
+  .rvm-body { padding: 2px 14px; }
+  .rvm-foot { padding: 10px 14px; }
+  .rvr { gap: 10px; }
+  .yjm { padding: 18px 16px; }
+  .play-sheet { padding: 20px 16px; }
+  .printnote { flex-direction: column; gap: 8px; }
+}
+
+@media (max-width: 560px) {
+  .st-act .primary { flex: 1 1 auto; }
+  .st-actmeta { font-size: 12px; }
+  .rvr-kept { width: 44px; }
+  .pv-how { padding: 14px; }
+  .setup-steps li { padding-left: 38px; }
+  .cid-hint { font-size: 12px; }
+}
