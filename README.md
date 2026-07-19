@@ -155,4 +155,4 @@ Flutster is an independent hobby project for personal use. It is not affiliated 
 
 ## License
 
-[AGPL-3.0](LICENSE)
+[AGPL-3.0](LICENSE). Use it, fork it, print decks forever; if you build on it, publish your source the same way, including anything you run as a service.
