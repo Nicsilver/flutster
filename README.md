@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/Nicsilver/flutster?label=release&color=e8590c" alt="Latest release"></a>
-  <a href="https://nicsilver.github.io/flutster/"><img src="https://img.shields.io/badge/card_maker-live-1c7ed6" alt="Card maker"></a>
-  <a href="https://nicsilver.github.io/flutster/#play"><img src="https://img.shields.io/badge/web_player-live-7048e8" alt="Web player"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-0ca678" alt="AGPL-3.0 license"></a>
+  <a href="../../releases/latest"><img src=".github/badges/release.svg" alt="Latest release"></a>
+  <a href="https://nicsilver.github.io/flutster/"><img src=".github/badges/card-maker.svg" alt="Card maker"></a>
+  <a href="https://nicsilver.github.io/flutster/#play"><img src=".github/badges/web-player.svg" alt="Web player"></a>
+  <a href="LICENSE"><img src=".github/badges/license.svg" alt="AGPL-3.0 license"></a>
 </p>
 
 Flutster is a complete kit for music-timeline party games. Print your own decks of QR song cards, then scan a card and the song plays without revealing itself. Everyone guesses the year, the card lands on the timeline, first full timeline wins.
