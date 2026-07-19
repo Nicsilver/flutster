@@ -861,7 +861,7 @@ export default function App() {
 
   if (!inPreview && (!clientId || !token)) {
     return (
-      <Shell narrow isDark={theme.isDark} action={<>{themeBtn}{modeBtn}{installBtn}</>}>
+      <Shell narrow isDark={theme.isDark} action={<>{themeBtn}{playBtn}{modeBtn}{installBtn}</>}>
         <SpotifyGate
           clientId={clientId}
           authError={authError}
