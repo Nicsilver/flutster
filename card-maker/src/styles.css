@@ -356,7 +356,16 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .yjm-err { font-size: 12.5px; font-weight: 700; color: var(--dec70); }
 
 /* /play: full-screen scan-and-play, mirroring the phone app */
-.playlink { display: inline-flex; align-items: center; gap: 5px; }
+/* Play is an action among settings, so it dresses like the primary buttons
+   (ink fill + spectrum strip) instead of a ghost chip. */
+.playlink {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--btn); color: var(--btn-fg); border: 1px solid var(--btn);
+  border-radius: 10px; padding: 7px 14px 8px; font-weight: 700; font-size: 14px;
+  position: relative; overflow: hidden;
+}
+.playlink::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2.5px; background: var(--spectrum); }
+.playlink:hover { color: var(--btn-fg); opacity: 0.88; }
 .playroot { position: fixed; inset: 0; z-index: 80; background: var(--bg); overflow-y: auto; }
 .playroot.oncam { background: #000; }
 .play-cam { position: absolute; inset: 0; }

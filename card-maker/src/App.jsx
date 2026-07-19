@@ -841,7 +841,7 @@ export default function App() {
   ) : null;
 
   const playBtn = (
-    <button className="ghost sm playlink" onClick={() => { window.location.hash = '#play'; }} title="Scan cards and play, right here in the browser">
+    <button className="playlink" onClick={() => { window.location.hash = '#play'; }} title="Scan cards and play, right here in the browser">
       <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z" /></svg>
       Play
     </button>
