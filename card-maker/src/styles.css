@@ -752,7 +752,11 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
   .studio.m-printopen { animation: none; transform: none; filter: none; }
   .studio .st-right { display: none; }
   .studio.m-printopen .st-right {
-    display: block; position: fixed; z-index: 76; left: 0; right: 0; bottom: 0; top: 9%;
+    /* Bottom-anchored with a viewport-unit cap, NOT top+bottom stretching:
+       inset-stretched fixed boxes mis-size under Chrome's device emulation,
+       and auto height lets a short sheet stay short. */
+    display: block; position: fixed; z-index: 76; left: 0; right: 0; bottom: 0; top: auto;
+    height: auto; max-height: 84vh; max-height: 84dvh;
     margin: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--panel);
     border-radius: 18px 18px 0 0; padding: 6px 18px 26px; box-shadow: var(--sheet-shadow);
   }
