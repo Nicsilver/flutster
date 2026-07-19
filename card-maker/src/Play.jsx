@@ -402,6 +402,34 @@ export default function PlayScreen({ token, onExit }) {
     setPhase('scan');
   }
 
+  // Keyboard controls for laptop play: space = the primary action (guess /
+  // tap to play / scan again), left-right = 15s seek (full songs only),
+  // up-down = pause. Re-registered each render so the handlers see fresh
+  // state; skipped while typing in a field.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.repeat) return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.code === 'Space') {
+        if (phase === 'playing' || phase === 'miss' || phase === 'error' || phase === 'nodevice') guess();
+        else if (phase === 'tap') tapPlay();
+        else return;
+        e.preventDefault();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (phase !== 'playing' || source !== 'spotify' || !token) return;
+        seekBy(e.key === 'ArrowLeft' ? -15 : 15);
+        e.preventDefault();
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (phase !== 'playing') return;
+        togglePause();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   function addSource() {
     const v = newSrc.trim();
     if (!v) return;
