@@ -19,6 +19,9 @@ final _resolver = CardResolver();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  // Game-night immersion: hide status and navigation bars; a swipe from the
+  // edge peeks them temporarily (sticky).
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await AppSettings.instance.load();
   runApp(const FlutsterApp());
 }
