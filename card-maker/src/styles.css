@@ -169,7 +169,11 @@ code { background: var(--field); border: 1px solid var(--line); padding: 3px 8px
 footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 18px; }
 
 @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.fade-in { animation: fade-in 0.4s ease both; }
+/* No fill mode: a filling animation keeps its transform applied forever,
+   which turns the element into the containing block for position:fixed
+   children — the mobile print sheet anchored to the studio, not the
+   viewport, and rendered thousands of px off-screen. */
+.fade-in { animation: fade-in 0.4s ease; }
 @media (prefers-reduced-motion: reduce) { *, .fade-in { animation: none !important; transition: none !important; } }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -743,6 +747,9 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
   .st-actmeta { font-size: 12px; }
 
   /* the layout rail as a print sheet */
+  /* The sheet is fixed-positioned from inside .studio: no ancestor may carry
+     a transform/filter while it's open, or it anchors to that ancestor. */
+  .studio.m-printopen { animation: none; transform: none; filter: none; }
   .studio .st-right { display: none; }
   .studio.m-printopen .st-right {
     display: block; position: fixed; z-index: 76; left: 0; right: 0; bottom: 0; top: 9%;
