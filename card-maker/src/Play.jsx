@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { parseTrackIds, playTrack, resumePlayback, pausePlayback, seekPlayback } from './spotify.js';
+import { parseTrackIds, playTrack, resumePlayback, pausePlayback, seekPlayback, fetchDevices, transferPlayback } from './spotify.js';
 import { resolveMeta } from './meta.js';
 import { findPreviewUrl } from './previews.js';
 import { loadSources, saveSources, tryParseCard, resolveCard, loadAllSources, invalidateSources, cardCount } from './decksources.js';
@@ -195,7 +195,20 @@ export default function PlayScreen({ token, onExit }) {
     setPhase('resolving');
     try {
       if (source === 'spotify' && token) {
-        await playTrack(uriRef.current, token);
+        try {
+          await playTrack(uriRef.current, token);
+        } catch (e) {
+          if (e.message !== 'NO_DEVICE') throw e;
+          // Spotify is often open somewhere but idle, which the play endpoint
+          // treats as "no device". Wake the likeliest device and retry once;
+          // only give up when the account truly has no device online.
+          const devices = await fetchDevices(token).catch(() => []);
+          const dev = devices.find((d) => d.is_active) || devices[0];
+          if (!dev) throw e;
+          await transferPlayback(dev.id, token);
+          await new Promise((r) => setTimeout(r, 700));
+          await playTrack(uriRef.current, token);
+        }
         setPhase('playing');
       } else {
         const meta = known || (await resolveMeta(id));
@@ -212,10 +225,13 @@ export default function PlayScreen({ token, onExit }) {
         else throw new Error('CLIP');
       }
     } catch (e) {
+      if (e.message === 'NO_DEVICE') {
+        setPhase('nodevice');
+        busyRef.current = false;
+        return;
+      }
       setMsg(
-        e.message === 'NO_DEVICE'
-          ? 'No active Spotify device. Open Spotify anywhere, play and pause any song once, then rescan.'
-          : e.message === 'PREMIUM'
+        e.message === 'PREMIUM'
           ? 'Full-song playback needs Spotify Premium. Switch to previews above.'
           : e.message === 'AUTH'
           ? 'Spotify login expired. Log in again from the card maker, then come back.'
@@ -509,6 +525,27 @@ export default function PlayScreen({ token, onExit }) {
               </div>
               <div className="play-foot">
                 <button className="guess-btn" onClick={guess}>SCAN NEXT</button>
+              </div>
+            </>
+          )}
+
+          {phase === 'nodevice' && (
+            <>
+              <div className="play-mid">
+                <h2>Wake up Spotify</h2>
+                <p className="play-sub">
+                  Flutster plays through your Spotify app, and Spotify isn&rsquo;t running
+                  anywhere right now. Takes ten seconds to fix:
+                </p>
+                <ol className="play-steps">
+                  <li>Open the <b>Spotify app</b> on this phone, a computer, or a speaker.</li>
+                  <li>Play <b>any song</b> for a moment, then pause it.</li>
+                  <li>Come back here and scan the card again.</li>
+                </ol>
+                <a className="play-openapp" href="spotify:">Open Spotify</a>
+              </div>
+              <div className="play-foot">
+                <button className="guess-btn" onClick={guess}>SCAN AGAIN</button>
               </div>
             </>
           )}

@@ -1,5 +1,6 @@
-// playback scope powers the /play page's full-song source.
-const SCOPES = 'playlist-read-private playlist-read-collaborative user-modify-playback-state';
+// playback scopes power the /play page's full-song source (read = seeing the
+// device list so a sleeping device can be woken automatically).
+const SCOPES = 'playlist-read-private playlist-read-collaborative user-modify-playback-state user-read-playback-state';
 const AUTH_URL = 'https://accounts.spotify.com/authorize';
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 
@@ -147,6 +148,27 @@ async function player(path, token, body) {
   if (resp.status === 403) throw new Error('PREMIUM');
   if (resp.status === 401) throw new Error('AUTH');
   if (!resp.ok && resp.status !== 204) throw new Error('SPOTIFY_' + resp.status);
+}
+
+// A device that has Spotify open but nothing playing is invisible to /play
+// (404 NO_DEVICE). Listing devices + transferring playback wakes it without
+// making the user touch Spotify at all. Returns [] when the token predates
+// the user-read-playback-state scope.
+export async function fetchDevices(token) {
+  const resp = await fetch('https://api.spotify.com/v1/me/player/devices', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!resp.ok) return [];
+  return (await resp.json()).devices || [];
+}
+
+export async function transferPlayback(deviceId, token) {
+  const resp = await fetch('https://api.spotify.com/v1/me/player', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_ids: [deviceId], play: false }),
+  });
+  return resp.ok || resp.status === 204;
 }
 
 export const playTrack = (uri, token) => player('/play', token, { uris: [uri] });

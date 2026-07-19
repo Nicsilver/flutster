@@ -409,6 +409,13 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .play-noteic { color: var(--ink); opacity: 0.85; }
 .play-noteic.dim { opacity: 0.4; }
 .play-sub { color: var(--muted); font-size: 14.5px; line-height: 1.55; margin: 2px 0 0; max-width: 42ch; }
+.play-steps { text-align: left; margin: 16px 0 0; padding-left: 24px; max-width: 40ch; font-size: 15px; line-height: 1.9; }
+.play-openapp {
+  display: inline-block; margin-top: 18px; padding: 10px 22px; border-radius: 10px;
+  border: 1px solid var(--line); color: var(--ink); background: var(--panel);
+  font-weight: 700; font-size: 14px; text-decoration: none;
+}
+.play-openapp:hover { background: var(--active); }
 .play-time { font-size: 46px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 22px 0 10px; }
 .ctl {
   width: 96px; height: 96px; border-radius: 50%; border: none; cursor: pointer;
