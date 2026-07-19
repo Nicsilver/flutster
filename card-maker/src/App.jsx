@@ -1331,7 +1331,7 @@ export default function App() {
               value={deckLabel}
               disabled={!playlist}
               onChange={(e) => setDeckLabel(e.target.value)}
-              title="Tiny tag printed along each card front's edge, for telling mixed decks apart. Same on every card, so fronts stay unmemorable."
+              title="Tiny tag printed at the foot of each card front, for telling mixed decks apart. Same on every card, so fronts stay unmemorable."
             />
           </div>
           <div className="st-setrow">
