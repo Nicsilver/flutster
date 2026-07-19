@@ -33,8 +33,19 @@ function Icon({ d, size = 24 }) {
 }
 
 export default function PlayScreen({ token, onExit }) {
-  // scan | resolving | tap | playing | miss | error
+  // scan | resolving | tap | playing | miss | nodevice | error
   const [phase, setPhase] = useState('scan');
+  // Game-night immersion: go fullscreen on touch devices (hides the status
+  // bar and browser chrome on Android; iOS Safari has no fullscreen API for
+  // pages, so this silently no-ops there). Works when /play is entered via a
+  // tap (transient activation); a cold URL load stays windowed.
+  useEffect(() => {
+    if (!window.matchMedia('(pointer: coarse)').matches) return;
+    document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch(() => {});
+    return () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+  }, []);
   const [source, setSource] = useState(() =>
     token && localStorage.getItem('flutster_playsrc') === 'spotify' ? 'spotify' : 'preview'
   );
