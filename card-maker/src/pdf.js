@@ -67,7 +67,7 @@ function drawCut(doc, x, y, cardMm) {
 
 // The equalizer skyline along a card edge. Round caps make the bars read as
 // the same species as the app's timeline.
-function drawSkyline(doc, x, y, k, seed, palette, edge, lift = 0) {
+function drawSkyline(doc, x, y, k, seed, palette, edge) {
   const { bars, w } = skyline(seed, edge);
   doc.setLineCap('round');
   doc.setLineWidth(w * k);
@@ -75,7 +75,7 @@ function drawSkyline(doc, x, y, k, seed, palette, edge, lift = 0) {
     doc.setDrawColor(...rgb(palette[b.ci % palette.length]));
     const bx = x + b.x * k;
     if (edge === 'top') doc.line(bx, y + 6 * k, bx, y + (6 + b.h) * k);
-    else doc.line(bx, y + (170 - lift) * k, bx, y + (170 - lift - b.h) * k);
+    else doc.line(bx, y + 170 * k, bx, y + (170 - b.h) * k);
   }
 }
 
@@ -106,34 +106,22 @@ export function estimatePerPage(opts) {
 
 // Fronts are pixel-identical on every card (fixed spectrum skyline + QR): the
 // front is face-up while people guess, so it must not be memorizable.
-// Deck label ("plate line"): centered small caps at the card's foot with a
-// hairline rule either side, like a printer's plate mark — so mixed printed
-// decks can be sorted apart. Identical on every card of a deck, so the
-// identical-fronts rule holds. The bottom skyline lifts to make room; decks
-// without a label keep the original geometry.
-const LABEL_LIFT = 6; // mock units the bottom skyline moves up when labeled
+// Deck label: tiny vertical edition tag on BOTH side edges, centered in the
+// gap between the card edge and the QR, so mixed printed decks can be sorted
+// apart whichever way a card lies. Identical on every card of a deck, so the
+// identical-fronts rule holds.
 function drawLabel(doc, label, x, y, cardMm, k) {
   const text = label.toUpperCase();
-  const charSpace = 0.35 * k;
+  const style = { align: 'center', angle: 90, charSpace: 0.3 * k };
   doc.setFont('Baloo2', 'semibold');
-  doc.setFontSize(6.5 * k * PT_PER_MM);
+  doc.setFontSize(7 * k * PT_PER_MM);
   doc.setTextColor(...rgb('#8d8577'));
-  const cx = x + cardMm / 2;
-  const baseY = y + 173 * k;
-  doc.text(text, cx, baseY, { align: 'center', charSpace });
-  // getTextWidth ignores charSpace; add it per gap by hand.
-  const tw = doc.getTextWidth(text) + Math.max(0, text.length - 1) * charSpace;
-  const gap = 5 * k;
-  const inset = 25 * k;
-  const half = tw / 2 + gap;
-  const ry = baseY - 2 * k;
-  if (cx - half > x + inset) {
-    doc.setDrawColor(...rgb('#d9cfba'));
-    doc.setLineWidth(0.35 * k);
-    doc.setLineCap('butt');
-    doc.line(x + inset, ry, cx - half, ry);
-    doc.line(cx + half, ry, x + cardMm - inset, ry);
-  }
+  const cy = y + cardMm / 2;
+  // QR starts 42 mock units in; the gap's midpoint is 21. Rotated glyphs hang
+  // toward -x from their baseline, so nudge the baseline +3.5 (half the cap
+  // height) to center the glyph column on the midpoint.
+  doc.text(text, x + 24.5 * k, cy, style);
+  doc.text(text, x + (MOCK - 21 + 3.5) * k, cy, style);
 }
 
 export async function makeFrontsPdf(tracks, opts) {
@@ -151,7 +139,7 @@ export async function makeFrontsPdf(tracks, opts) {
     if (cut) drawCut(doc, x, y, cardMm);
     if (style !== 'minimal') {
       drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'top');
-      drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'bottom', label ? LABEL_LIFT : 0);
+      drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'bottom');
     }
     const qs = cardMm * 0.52;
     drawQr(doc, tracks[i].uri, x + (cardMm - qs) / 2, y + (cardMm - qs) / 2, qs);
