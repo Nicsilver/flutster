@@ -240,10 +240,16 @@ export default function PlayScreen({ token, onExit }) {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     (async () => {
       try {
+        // Without explicit resolution browsers default to 640×480, which
+        // looks far worse than the app's camera and decodes worse too.
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
+          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: false,
         });
+        // Close-range QR needs continuous focus where the camera supports it.
+        stream.getVideoTracks()[0]
+          ?.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+          .catch(() => {});
       } catch {
         setCamErr('Camera access is needed to scan cards. Allow it in the browser and reload.');
         return;
@@ -270,8 +276,10 @@ export default function PlayScreen({ token, onExit }) {
             text = codes[0]?.rawValue || '';
           } catch {}
         } else {
-          const w = 480;
-          const h = Math.round((video.videoHeight / video.videoWidth) * w) || 360;
+          // 800 px keeps jsQR fast (~0.5 MP per pass) while leaving enough
+          // pixels to read a card-sized QR at arm's length.
+          const w = Math.min(800, video.videoWidth || 800);
+          const h = Math.round((video.videoHeight / video.videoWidth) * w) || 600;
           canvas.width = w;
           canvas.height = h;
           ctx.drawImage(video, 0, 0, w, h);

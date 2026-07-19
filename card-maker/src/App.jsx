@@ -159,6 +159,53 @@ function useTheme() {
 // Below 900px the studio swaps its three side-by-side zones for a dock: two
 // tabs (decks, songs) and a Print button that raises the layout rail as a
 // bottom sheet. Desktop keeps the three-zone layout untouched.
+// PWA install. Chrome-family browsers fire beforeinstallprompt when the site
+// qualifies; stash the event so a visible Install button can raise the native
+// prompt. iOS/WebKit never fires it (install is manual: Share → Add to Home
+// Screen), so there the button opens instructions instead.
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+  window.dispatchEvent(new Event('flutster-installable'));
+});
+const isStandalone = () =>
+  window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  // iPadOS masquerades as macOS but is the only "Mac" with touch.
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+function useInstall() {
+  const [avail, setAvail] = useState(() => !isStandalone() && (deferredInstall !== null || isIOS()));
+  const [iosHelp, setIosHelp] = useState(false);
+  useEffect(() => {
+    const onCan = () => setAvail(!isStandalone());
+    const onDone = () => {
+      deferredInstall = null;
+      setAvail(false);
+    };
+    window.addEventListener('flutster-installable', onCan);
+    window.addEventListener('appinstalled', onDone);
+    return () => {
+      window.removeEventListener('flutster-installable', onCan);
+      window.removeEventListener('appinstalled', onDone);
+    };
+  }, []);
+  const install = async () => {
+    if (deferredInstall) {
+      const ev = deferredInstall;
+      deferredInstall = null; // Chrome allows prompt() once per event
+      ev.prompt();
+      const choice = await ev.userChoice.catch(() => null);
+      if (choice?.outcome === 'accepted') setAvail(false);
+    } else {
+      setIosHelp(true);
+    }
+  };
+  return { avail, install, iosHelp, closeIosHelp: () => setIosHelp(false) };
+}
+
 const MOBILE_MQ = '(max-width: 900px)';
 function useIsMobile() {
   const [mobile, setMobile] = useState(() => window.matchMedia(MOBILE_MQ).matches);
@@ -758,6 +805,31 @@ export default function App() {
       {theme.isDark ? 'Light' : 'Dark'}
     </button>
   );
+  const inst = useInstall();
+  const installBtn = inst.avail ? (
+    <>
+      <button className="ghost sm" onClick={inst.install} title="Install as an app on this device">
+        Install
+      </button>
+      {inst.iosHelp && (
+        <div className="rvm-back" onClick={inst.closeIosHelp} role="dialog" aria-modal="true" aria-label="Install on iPhone or iPad">
+          <div className="yjm" onClick={(e) => e.stopPropagation()}>
+            <h3>Install on iPhone or iPad</h3>
+            <p>Apple only allows installing from the browser&rsquo;s own menu:</p>
+            <ol className="ios-steps">
+              <li>Tap the <b>Share</b> button (the square with an arrow).</li>
+              <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+              <li>Tap <b>Add</b>. Flutster appears as an app.</li>
+            </ol>
+            <div className="yjm-row">
+              <span className="grow" />
+              <button className="primary sm-cta" onClick={inst.closeIosHelp}>Got it</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  ) : null;
   const modeBtn = mode ? (
     <button
       className="ghost sm"
@@ -781,7 +853,7 @@ export default function App() {
 
   if (!mode) {
     return (
-      <Shell isDark={theme.isDark} action={<>{themeBtn}{playBtn}</>}>
+      <Shell isDark={theme.isDark} action={<>{themeBtn}{playBtn}{installBtn}</>}>
         <ModeChooser onPick={setMode} />
       </Shell>
     );
@@ -789,7 +861,7 @@ export default function App() {
 
   if (!inPreview && (!clientId || !token)) {
     return (
-      <Shell narrow isDark={theme.isDark} action={<>{themeBtn}{modeBtn}</>}>
+      <Shell narrow isDark={theme.isDark} action={<>{themeBtn}{modeBtn}{installBtn}</>}>
         <SpotifyGate
           clientId={clientId}
           authError={authError}
@@ -811,6 +883,7 @@ export default function App() {
           {themeBtn}
           {playBtn}
           {modeBtn}
+          {installBtn}
           {!inPreview && <button className="ghost sm" onClick={() => { logout(); setToken(null); }}>Log out</button>}
         </>
       }
