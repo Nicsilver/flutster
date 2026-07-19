@@ -112,16 +112,23 @@ export function estimatePerPage(opts) {
 // identical-fronts rule holds.
 function drawLabel(doc, label, x, y, cardMm, k) {
   const text = label.toUpperCase();
-  const style = { align: 'center', angle: 90, charSpace: 0.3 * k };
+  const charSpace = 0.3 * k;
   doc.setFont('Baloo2', 'semibold');
   doc.setFontSize(7 * k * PT_PER_MM);
   doc.setTextColor(...rgb('#8d8577'));
-  const cy = y + cardMm / 2;
-  // QR starts 42 mock units in; the gap's midpoint is 21. Rotated glyphs hang
-  // toward -x from their baseline, so nudge the baseline +3.5 (half the cap
-  // height) to center the glyph column on the midpoint.
-  doc.text(text, x + 24.5 * k, cy, style);
-  doc.text(text, x + (MOCK - 21 + 3.5) * k, cy, style);
+  // jsPDF's align:center mis-places rotated text, so center by hand: with
+  // angle 90 the run starts at its anchor and extends upward, so drop the
+  // anchor half the measured run below the card's midline. getTextWidth
+  // ignores charSpace; add it per gap.
+  const len = doc.getTextWidth(text) + Math.max(0, text.length - 1) * charSpace;
+  const mid = y + cardMm / 2;
+  // Mirrored like facing book spines: left reads bottom-to-top (run extends
+  // up from the anchor, glyphs hang toward -x), right top-to-bottom (run
+  // extends down, glyphs hang toward +x). QR starts 42 mock units in; the
+  // gap's midpoint is 21, and the baseline sits 3.5 (half the cap height)
+  // past it so the glyph column centers on the midpoint.
+  doc.text(text, x + 24.5 * k, mid + len / 2, { angle: 90, charSpace });
+  doc.text(text, x + (MOCK - 24.5) * k, mid - len / 2, { angle: -90, charSpace });
 }
 
 export async function makeFrontsPdf(tracks, opts) {
