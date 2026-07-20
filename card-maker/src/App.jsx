@@ -4,7 +4,7 @@ import { verifyYears, saveOverride, plausibleYear } from './years.js';
 import { checkPreviews } from './previews.js';
 import { fetchPastedTracks, deckKey, loadSavedDecks, saveDeck } from './meta.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
-import { cardColors, rz, INK, DESIGNS, designFor, loadDesigns, saveDesigns } from './cardstyle.js';
+import { cardColors, rz, DESIGNS, designFor, loadDesigns, saveDesigns } from './cardstyle.js';
 import PlayScreen from './Play.jsx';
 
 const A4_W = 210; // mm — page width drives the auto card size
@@ -302,7 +302,11 @@ export default function App() {
   const [perRow, setPerRow] = useState(3);
   const [cut, setCut] = useState(true);
   const [flip, setFlip] = useState('long');
-  const [cardStyle, setCardStyle] = useState(() => localStorage.getItem('flutster_cardstyle') || 'color');
+  const [cardStyle, setCardStyle] = useState(() => {
+    const s = localStorage.getItem('flutster_cardstyle');
+    // "minimal" (least ink) folded into B&W — both are now the one simple style.
+    return s === 'minimal' ? 'bw' : s || 'color';
+  });
   const [designs, setDesignsRaw] = useState(loadDesigns);
   const [designOpen, setDesignOpen] = useState(false);
   const setDesigns = (list) => {
@@ -1326,16 +1330,16 @@ export default function App() {
             >
               <option value="color">Colour</option>
               <option value="bw">B&W · ink saver</option>
-              <option value="minimal">Minimal · least ink</option>
             </select>
           </div>
-          <div className="st-setrow">
+          <div className={'st-setrow' + (cardStyle === 'bw' ? ' dim' : '')}>
             <span>Card design</span>
             <button
               type="button"
               className="st-flip st-design"
               onClick={() => setDesignOpen(true)}
-              title="Pick one back design, or several to mix across the deck"
+              disabled={cardStyle === 'bw'}
+              title={cardStyle === 'bw' ? 'B&W uses the one simple design' : 'Pick one back design, or several to mix across the deck'}
             >
               {designLabel(designs)} <span className="st-caret">▾</span>
             </button>
@@ -2115,11 +2119,12 @@ const CELL_LAYOUT = {
 // rules can hide them wholesale.
 function CellBack({ t, cardStyle, design = 'skyline' }) {
   const { seed, palette } = cardColors(t.uri);
+  // B&W is the one simple, least-ink design: no decorations, bare ink year,
+  // and it ignores the design picker entirely.
   const bw = cardStyle === 'bw';
-  const minimal = cardStyle === 'minimal';
-  if (minimal) design = 'skyline';
-  const col = (i) => (bw ? INK : palette[i % palette.length]);
-  const pill = bw ? INK : palette[1];
+  if (bw) design = 'skyline';
+  const col = (i) => palette[i % palette.length];
+  const pill = palette[1];
   const strip = (edge, s) => (
     <span className={'cellsky csdec ' + edge}>
       {Array.from({ length: 9 }, (_, i) => (
@@ -2193,11 +2198,11 @@ function CellBack({ t, cardStyle, design = 'skyline' }) {
   const edgeStrip = (side) => (
     <i
       className={'csdec csedge ' + side}
-      style={{ background: bw ? INK : 'linear-gradient(90deg, #e3a008 0 16.6%, #e8590c 0 33.3%, #d6336c 0 50%, #0ca678 0 66.6%, #1c7ed6 0 83.3%, #7048e8 0 100%)' }}
+      style={{ background: 'linear-gradient(90deg, #e3a008 0 16.6%, #e8590c 0 33.3%, #d6336c 0 50%, #0ca678 0 66.6%, #1c7ed6 0 83.3%, #7048e8 0 100%)' }}
     />
   );
 
-  const deco = minimal ? null : (
+  const deco = bw ? null : (
     <>
       {design === 'skyline' && <>{strip('t', seed + 4)}{strip('b', seed)}</>}
       {design === 'edges' && <>{edgeStrip('t')}{edgeStrip('b')}{strip('t', seed + 4)}{strip('b', seed)}</>}
@@ -2214,7 +2219,7 @@ function CellBack({ t, cardStyle, design = 'skyline' }) {
     </>
   );
 
-  const layout = minimal ? 'pill' : CELL_LAYOUT[design] || 'pill';
+  const layout = bw ? 'pill' : CELL_LAYOUT[design] || 'pill';
   if (layout === 'ring') {
     return (
       <>
@@ -2225,7 +2230,7 @@ function CellBack({ t, cardStyle, design = 'skyline' }) {
       </>
     );
   }
-  const ink = layout === 'ink' || minimal;
+  const ink = layout === 'ink' || bw;
   return (
     <>
       {deco}

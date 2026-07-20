@@ -82,8 +82,8 @@ function drawSkyline(doc, x, y, k, seed, palette, edge, off = 0) {
 // ---- back-design decorations -----------------------------------------------
 // All geometry is in mock units (MOCK = 176 = card side), ported from the
 // approved card-lab mockups where the card was 100 cqw (×1.76 here). Colors
-// always come from the card's shuffled palette (or [INK] in B&W) so every
-// design keeps the hashed-from-URI identity of the original Skyline.
+// come from the card's shuffled palette so every design keeps the
+// hashed-from-URI identity of the original Skyline. (B&W skips decorations.)
 
 // Skyline Border (202/231): short skylines flush with all four cut edges,
 // bars growing inward. The half-linewidth inset keeps round caps on the card.
@@ -281,7 +281,7 @@ export async function makeFrontsPdf(tracks, opts) {
   const L = layout(opts);
   const doc = newDoc();
   const k = cardMm / MOCK;
-  const palette = style === 'bw' ? [INK] : SPECTRUM;
+  const palette = SPECTRUM;
   for (let i = 0; i < tracks.length; i++) {
     const slot = i % L.perPage;
     if (i > 0 && slot === 0) doc.addPage();
@@ -289,7 +289,8 @@ export async function makeFrontsPdf(tracks, opts) {
     const row = Math.floor(slot / L.cols);
     const { x, y } = cellXY(col, row, L, opts);
     if (cut) drawCut(doc, x, y, cardMm);
-    if (style !== 'minimal') {
+    // B&W is the simple, least-ink style — no front skylines.
+    if (style !== 'bw') {
       drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'top');
       drawSkyline(doc, x, y, k, FRONT_SEED, palette, 'bottom');
     }
@@ -321,13 +322,13 @@ export async function makeBacksPdf(tracks, opts) {
 
     const t = tracks[i];
     const { seed, palette: full } = cardColors(t.uri);
-    const minimal = style === 'minimal';
-    const palette = style === 'bw' ? [INK] : full;
-    const pillColor = style === 'bw' ? INK : full[1];
-    // Minimal ("least ink") ignores the design picker entirely: no
-    // decorations, bare ink digits — identical whatever is selected.
-    const design = minimal ? 'skyline' : designFor(t.uri, designs);
-    if (!minimal) {
+    // B&W is the one simple, least-ink style: no decorations, bare ink digits,
+    // and it ignores the design picker entirely.
+    const bw = style === 'bw';
+    const palette = full;
+    const pillColor = full[1];
+    const design = bw ? 'skyline' : designFor(t.uri, designs);
+    if (!bw) {
       switch (design) {
         case 'border':
         case 'borderink':
@@ -357,7 +358,7 @@ export async function makeBacksPdf(tracks, opts) {
           drawRing(doc, x, y, k, seed + 5, palette, RING_GEOM.viewfinder);
           break;
         case 'edges':
-          drawEdgeStrips(doc, x, y, k, style === 'bw');
+          drawEdgeStrips(doc, x, y, k, false);
           drawSkyline(doc, x, y, k, seed, palette, 'top', 4);
           drawSkyline(doc, x, y, k, seed, palette, 'bottom', 4);
           break;
@@ -368,7 +369,7 @@ export async function makeBacksPdf(tracks, opts) {
     }
 
     const cx = x + cardMm / 2;
-    const mode = minimal ? 'pill' : LAYOUT[design] || 'pill';
+    const mode = bw ? 'pill' : LAYOUT[design] || 'pill';
 
     if (mode === 'ring') {
       // Ring family: artist along the top, big ink year dead center inside
@@ -418,8 +419,8 @@ export async function makeBacksPdf(tracks, opts) {
     // ink-year designs skip the fill and print bare ink digits — the pill is
     // the biggest ink sink on a card.
     const yearStr = String(t.year || '?');
-    doc.setFontSize((minimal ? 27 : inkYear ? 30 : 24) * k * PT_PER_MM);
-    if (minimal || inkYear) {
+    doc.setFontSize((bw ? 27 : inkYear ? 30 : 24) * k * PT_PER_MM);
+    if (bw || inkYear) {
       doc.setTextColor(...rgb(INK));
     } else {
       const pillW = doc.getTextWidth(yearStr) + 60 * k;
