@@ -691,6 +691,7 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
   aspect-ratio: 1; border-radius: 3px; min-width: 0; overflow: hidden; position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   color: var(--paper-ink); padding: 3% 3% 3%;
+  container-type: inline-size; /* decoration minis size themselves in cqw */
 }
 .sheet-cell.cut { border: 1px dashed var(--paper-line); }
 .sheet-cell .yr { font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.15; font-size: 15px; color: var(--dc, var(--paper-ink)); }
@@ -853,4 +854,106 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
   .pv-how { padding: 14px; }
   .setup-steps li { padding-left: 38px; }
   .cid-hint { font-size: 12px; }
+}
+
+/* ---- card-back design picker (the "card table") ---- */
+
+/* mini decorations shared by the sheet preview and the picker tiles; all
+   absolute % of the card so they scale, cqw only where % can't go
+   (border widths). .csdec lets the dense/tiny sheets hide them wholesale. */
+.csv { position: absolute; top: 16%; bottom: 16%; width: 10%; display: flex; flex-direction: column; justify-content: space-between; }
+.csv.l { left: 0; align-items: flex-start; }
+.csv.r { right: 0; align-items: flex-end; }
+.csv i { height: 7%; border-radius: 2px; }
+.csled { position: absolute; border-radius: 999px; }
+.csbk { position: absolute; width: 17%; height: 17%; border: 0 solid transparent; }
+.csbk.tl { top: 4.5%; left: 4.5%; border-top-width: 2.6cqw; border-left-width: 2.6cqw; }
+.csbk.tr { top: 4.5%; right: 4.5%; border-top-width: 2.6cqw; border-right-width: 2.6cqw; }
+.csbk.br { bottom: 4.5%; right: 4.5%; border-bottom-width: 2.6cqw; border-right-width: 2.6cqw; }
+.csbk.bl { bottom: 4.5%; left: 4.5%; border-bottom-width: 2.6cqw; border-left-width: 2.6cqw; }
+.csrail { position: absolute; top: 0; bottom: 0; width: 3.2%; }
+.csrail.l { left: 0; }
+.csrail.r { right: 0; }
+.cseq { position: absolute; height: 12%; width: 31%; display: flex; gap: 4%; }
+.cseq.tl { top: 5%; left: 5%; align-items: flex-start; }
+.cseq.br { bottom: 5%; right: 5%; align-items: flex-end; }
+.cseq i { flex: 1; border-radius: 999px; }
+.csring {
+  position: absolute; border-radius: 50%;
+  -webkit-mask: radial-gradient(circle, transparent 0 62%, #000 63% 78%, transparent 79%);
+  mask: radial-gradient(circle, transparent 0 62%, #000 63% 78%, transparent 79%);
+}
+.csedge { position: absolute; left: 0; right: 0; height: 2.4%; }
+.csedge.t { top: 0; }
+.csedge.b { bottom: 0; }
+.rga { position: absolute; top: 5%; left: 6%; right: 6%; }
+.rgt { position: absolute; bottom: 5%; left: 6%; right: 6%; }
+.sheet.dense .csdec, .sheet.tiny .csdec { display: none; }
+
+/* rail entry point */
+.st-design { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.st-design .st-caret { font-size: 9px; color: var(--muted); }
+
+/* standalone mini card (picker tiles + footer strip) */
+.dcard {
+  position: relative; width: 100%; aspect-ratio: 1; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 4%; border-radius: 7%;
+  background: var(--paper); color: var(--paper-ink); box-shadow: var(--tile-shadow);
+  container-type: inline-size;
+}
+.dcard .yr { font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.15; font-size: 13cqw; color: var(--paper-ink); }
+.dcard .yrpill { color: #fffdf8; border-radius: 999px; padding: 0 9cqw 1cqw; margin: 1cqw 0 2cqw; }
+.dcard .yrpill.plain { color: var(--paper-ink); padding: 0; }
+.dcard b { font-size: 8cqw; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dcard i { font-style: normal; font-size: 6.5cqw; color: var(--paper-sub); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* the dealt table */
+.dtable {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 30px 18px;
+  background: var(--field); border: 1px solid var(--line); border-radius: 12px;
+  padding: 24px 20px 34px; margin: 14px 0;
+}
+.dtile {
+  position: relative; border: 0; background: transparent; padding: 0; cursor: pointer;
+  border-radius: 8px; transform: rotate(var(--rot, 0deg)); transition: transform 0.16s ease;
+}
+.dtile:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+.dtile .dcard { opacity: 0.62; }
+.dtile.on { transform: none; }
+.dtile.on .dcard { opacity: 1; outline: 3px solid var(--dec90); outline-offset: 2px; }
+.dchip {
+  position: absolute; right: -9px; bottom: 12px; z-index: 2; width: 26px; height: 26px;
+  border-radius: 50%; background: var(--dec90); color: #fffdf8; font-size: 14px; font-weight: 800;
+  line-height: 26px; text-align: center; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28); display: none;
+}
+.dtile.on .dchip { display: block; }
+.dtile em {
+  display: block; margin-top: 6px; font-style: normal; font-size: 10.5px; font-weight: 700;
+  color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dtile.on em { color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .dtile:hover { transform: rotate(var(--rot, 0deg)) translateY(-3px); }
+  .dtile.on:hover { transform: translateY(-3px); }
+}
+
+.dsum b { display: block; font-size: 12.5px; }
+.dsum span { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+.dmini { display: flex; gap: 5px; }
+.dmini .dcard { width: 30px; border-radius: 4px; }
+.dmini .dcard b, .dmini .dcard i { display: none; }
+.dmini .dcard .yr { font-size: 16cqw; }
+
+@media (min-width: 901px) {
+  .rvm.design { width: min(720px, 100%); }
+  /* center in the space left of the rail so its live sheet preview stays visible */
+  .rvm-back.designback { padding-right: 330px; }
+}
+@media (max-width: 900px) {
+  .dtable { grid-template-columns: 1fr 1fr; gap: 26px 14px; padding: 16px 14px 26px; }
+  /* footer: count + live strip on one line, full-width Done under */
+  .rvm.design .rvm-foot { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+  .rvm.design .rvm-foot .grow { display: none; }
+  .rvm.design .rvm-foot .primary { grid-column: 1 / -1; width: 100%; }
 }

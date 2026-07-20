@@ -64,3 +64,45 @@ export function skyline(seed, edge) {
 
 // Fixed front: identical on every card, spectrum palette, constant seed.
 export const FRONT_SEED = 7;
+
+// The back-design picker: 11 approved backs (card-lab rounds, 2026-07-19).
+// Any subset can be active; with several active each card's design hashes
+// from its track URI, so a given card keeps its back for as long as the
+// selection stays the same. Order matters for that hash — keep selections
+// in this canonical order.
+export const DESIGNS = [
+  { id: 'skyline', name: 'Skyline' },
+  { id: 'border', name: 'Skyline Border' },
+  { id: 'led', name: 'LED Border' },
+  { id: 'brackets', name: 'Corner Brackets' },
+  { id: 'rails', name: 'Ticket Rails' },
+  { id: 'eq', name: 'EQ Corners' },
+  { id: 'ring', name: 'LED Ring' },
+  { id: 'edges', name: 'Skyline + Edges' },
+  { id: 'borderink', name: 'Skyline Border · ink year' },
+  { id: 'ledkit', name: 'LED Kit' },
+  { id: 'viewfinder', name: 'Viewfinder' },
+];
+const DESIGN_IDS = new Set(DESIGNS.map((d) => d.id));
+
+export function designFor(uri, selected) {
+  if (!selected || selected.length === 0) return 'skyline';
+  if (selected.length === 1) return selected[0];
+  return selected[hashStr(uri || '') % selected.length];
+}
+
+const DESIGNS_KEY = 'flutster_carddesign';
+export function loadDesigns() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DESIGNS_KEY) || '[]');
+    const list = (Array.isArray(raw) ? raw : []).filter((id) => DESIGN_IDS.has(id));
+    return list.length ? list : ['skyline'];
+  } catch {
+    return ['skyline'];
+  }
+}
+export function saveDesigns(list) {
+  try {
+    localStorage.setItem(DESIGNS_KEY, JSON.stringify(list));
+  } catch {}
+}

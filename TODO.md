@@ -5,12 +5,9 @@ or releasing Flutster.
 
 ## Next up
 
-- **Card-back design picker in the card maker.** A "Card design" select when
-  generating backs: 11 approved designs (current Skyline stays the default),
-  plus a "Mix" option that prints all designs equally across the deck (design
-  assignment must be reproducible so reprints match). Fronts are untouched.
-  Design decision record and mockup sources live locally in
-  `staging/card-lab/PICKED.md` (not committed).
+Nothing queued. (The card-back design picker shipped: "Card design" row in
+the layout rail opens the card-table modal, check any subset of the 11
+approved backs, several checked = even hashed split across the deck.)
 
 ## Waiting on something
 

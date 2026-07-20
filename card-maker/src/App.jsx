@@ -4,7 +4,7 @@ import { verifyYears, saveOverride, plausibleYear } from './years.js';
 import { checkPreviews } from './previews.js';
 import { fetchPastedTracks, deckKey, loadSavedDecks, saveDeck } from './meta.js';
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
-import { cardColors, rz, INK } from './cardstyle.js';
+import { cardColors, rz, INK, DESIGNS, designFor, loadDesigns, saveDesigns } from './cardstyle.js';
 import PlayScreen from './Play.jsx';
 
 const A4_W = 210; // mm — page width drives the auto card size
@@ -303,6 +303,12 @@ export default function App() {
   const [cut, setCut] = useState(true);
   const [flip, setFlip] = useState('long');
   const [cardStyle, setCardStyle] = useState(() => localStorage.getItem('flutster_cardstyle') || 'color');
+  const [designs, setDesignsRaw] = useState(loadDesigns);
+  const [designOpen, setDesignOpen] = useState(false);
+  const setDesigns = (list) => {
+    setDesignsRaw(list);
+    saveDesigns(list);
+  };
   const [capOn, setCapOn] = useState(false);
   const [capN, setCapN] = useState(2);
   const [railQuery, setRailQuery] = useState('');
@@ -370,7 +376,7 @@ export default function App() {
       return next;
     });
   }
-  const opts = { cardMm, marginMm, gapMm, cut, flip, style: cardStyle, label: deckLabel.trim() };
+  const opts = { cardMm, marginMm, gapMm, cut, flip, style: cardStyle, label: deckLabel.trim(), designs };
   const grid = useMemo(() => estimatePerPage(opts), [cardMm, marginMm, gapMm]);
 
   const orderIdx =
@@ -1286,6 +1292,7 @@ export default function App() {
             cut={cut}
             hasPlaylist={!!playlist}
             cardStyle={cardStyle}
+            designs={designs}
           />
           <div className="st-a4cap">A4 · {grid.cols}×{grid.rows} grid · {cardMm} mm cards</div>
           <div className="st-setrow">
@@ -1321,6 +1328,17 @@ export default function App() {
               <option value="bw">B&W · ink saver</option>
               <option value="minimal">Minimal · least ink</option>
             </select>
+          </div>
+          <div className="st-setrow">
+            <span>Card design</span>
+            <button
+              type="button"
+              className="st-flip st-design"
+              onClick={() => setDesignOpen(true)}
+              title="Pick one back design, or several to mix across the deck"
+            >
+              {designLabel(designs)} <span className="st-caret">▾</span>
+            </button>
           </div>
           <div className="st-setrow">
             <span>Deck label</span>
@@ -1435,6 +1453,14 @@ export default function App() {
             setYearsModal(true);
           }}
           onClose={() => setReviewOpen(false)}
+        />
+      )}
+      {designOpen && (
+        <CardDesignModal
+          selected={designs}
+          onChange={setDesigns}
+          onClose={() => setDesignOpen(false)}
+          stripTracks={isMobile ? tracks.slice(0, 6) : []}
         />
       )}
     </Shell>
@@ -2005,39 +2031,214 @@ function RowYear({ t, onEdit, onKeep, done }) {
   );
 }
 
-// Mini render of the real card design (155): double skyline, wide year pill.
-function CellBack({ t, cardStyle }) {
+const designLabel = (list) =>
+  list.length === 1 ? DESIGNS.find((d) => d.id === list[0])?.name || 'Skyline' : `Mix · ${list.length}`;
+
+// Every design tile in the picker previews the same sample card so the 11
+// backs compare like-for-like (same trick as the card-lab mockups).
+const DESIGN_SAMPLE = { artist: 'ABBA', title: 'Dancing Queen', year: 1976, uri: 'spotify:track:0GjEhVFGZW8afUYGChu3Rr' };
+
+// The back-design picker: the 11 approved backs dealt loosely on a table.
+// Tapping a card straightens it and deals it into the deck; one selected =
+// the whole deck, several = an even hashed split. The last card can't be
+// removed. On phones this goes full screen (rvm media rules) and the footer
+// shows a live strip of the first printable cards, since the rail's sheet
+// preview is hidden behind the modal there.
+function CardDesignModal({ selected, onChange, onClose, stripTracks }) {
+  const has = (id) => selected.includes(id);
+  const toggle = (id) => {
+    if (has(id) && selected.length === 1) return;
+    const next = has(id) ? selected.filter((x) => x !== id) : [...selected, id];
+    // canonical order keeps the mix assignment independent of click order
+    onChange(DESIGNS.filter((d) => next.includes(d.id)).map((d) => d.id));
+  };
+  const rots = [-2.5, 1.8, -1.2, 2.6, -3, 1.4, 2.2, -1.8, 3, -2.2, 1.6];
+  return (
+    <div className="rvm-back designback" onClick={onClose} role="dialog" aria-modal="true" aria-label="Card design">
+      <div className="rvm design" onClick={(e) => e.stopPropagation()}>
+        <div className="rvm-strip" aria-hidden="true" />
+        <div className="rvm-head">
+          <h3>Card design</h3>
+          <span className="rvm-sub">tap the cards you want in the deck</span>
+        </div>
+        <div className="rvm-body">
+          <div className="dtable">
+            {DESIGNS.map((d, i) => (
+              <button
+                key={d.id}
+                type="button"
+                className={'dtile' + (has(d.id) ? ' on' : '')}
+                style={{ '--rot': `${rots[i]}deg` }}
+                aria-pressed={has(d.id)}
+                onClick={() => toggle(d.id)}
+              >
+                <span className="dcard">
+                  <CellBack t={DESIGN_SAMPLE} cardStyle="color" design={d.id} />
+                </span>
+                <span className="dchip" aria-hidden="true">✓</span>
+                <em>{d.name}</em>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="rvm-foot">
+          <span className="dsum">
+            <b>{selected.length === 1 ? `${designLabel(selected)} · whole deck` : `${selected.length} designs in the deck`}</b>
+            <span>{selected.length === 1 ? 'Tap more cards to mix designs.' : 'Even split across the cards.'}</span>
+          </span>
+          {stripTracks.length > 0 && (
+            <span className="dmini" aria-hidden="true">
+              {stripTracks.map((t) => (
+                <span key={t.uri} className="dcard">
+                  <CellBack t={t} cardStyle="color" design={designFor(t.uri, selected)} />
+                </span>
+              ))}
+            </span>
+          )}
+          <span className="grow" />
+          <button className="primary sm-cta" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Which text layout a design's mini render uses (mirrors LAYOUT in pdf.js).
+const CELL_LAYOUT = {
+  borderink: 'ink', led: 'ink', brackets: 'ink', rails: 'ink', eq: 'ink',
+  ring: 'ring', ledkit: 'ring', viewfinder: 'ring',
+};
+
+// Mini render of the printed backs for the sheet preview and design picker.
+// Approximate on purpose (the PDF is the source of truth) but each design is
+// recognizably itself. Decoration spans carry .csdec so the dense/tiny sheet
+// rules can hide them wholesale.
+function CellBack({ t, cardStyle, design = 'skyline' }) {
   const { seed, palette } = cardColors(t.uri);
   const bw = cardStyle === 'bw';
   const minimal = cardStyle === 'minimal';
+  if (minimal) design = 'skyline';
+  const col = (i) => (bw ? INK : palette[i % palette.length]);
   const pill = bw ? INK : palette[1];
   const strip = (edge, s) => (
-    <span className={'cellsky ' + edge}>
+    <span className={'cellsky csdec ' + edge}>
       {Array.from({ length: 9 }, (_, i) => (
         <i
           key={i}
           style={{
             height: `${rz(s, i, edge === 't' ? 8 : 14, edge === 't' ? 20 : 38)}%`,
-            background: bw ? INK : palette[(s + i) % palette.length],
+            background: col(s + i),
           }}
         />
       ))}
     </span>
   );
+  const vstrip = (side, s) => (
+    <span className={'csdec csv ' + side}>
+      {Array.from({ length: 7 }, (_, i) => (
+        <i key={i} style={{ width: `${rz(s, i, 28, 88)}%`, background: col(s + i) }} />
+      ))}
+    </span>
+  );
+  const ledBorder = () => {
+    const out = [];
+    for (let i = 0; i < 8; i++) {
+      const p = `${4 + i * 12.3}%`;
+      out.push({ left: p, top: '3.5%', width: '8.4%', height: '2.6%' });
+      out.push({ left: p, bottom: '3.5%', width: '8.4%', height: '2.6%' });
+    }
+    for (let i = 1; i < 7; i++) {
+      const p = `${4 + i * 12.3}%`;
+      out.push({ top: p, left: '3.5%', width: '2.6%', height: '8.4%' });
+      out.push({ top: p, right: '3.5%', width: '2.6%', height: '8.4%' });
+    }
+    return out.map((s, i) => <i key={i} className="csdec csled" style={{ ...s, background: col(seed + i) }} />);
+  };
+  const brackets = () =>
+    ['tl', 'tr', 'br', 'bl'].map((c, i) => (
+      <i key={c} className={'csdec csbk ' + c} style={{ borderColor: col(i) }} />
+    ));
+  const railsEls = () => {
+    const stops = Array.from({ length: 6 }, (_, i) => `${col(i)} ${i * 16.66}% ${(i + 1) * 16.66}%`).join(', ');
+    return (
+      <>
+        <i className="csdec csrail l" style={{ background: `linear-gradient(180deg, ${stops})` }} />
+        <i className="csdec csrail r" style={{ background: `linear-gradient(180deg, ${stops})` }} />
+      </>
+    );
+  };
+  const eqEls = () =>
+    [0, 1].map((ci) => (
+      <span key={ci} className={'csdec cseq ' + (ci ? 'br' : 'tl')}>
+        {Array.from({ length: 7 }, (_, i) => (
+          <i
+            key={i}
+            style={{
+              height: `${((3 + 8 * Math.abs(Math.sin((i + ci * 3 + seed) * 0.9))) / 11) * 100}%`,
+              background: col(i * 5 + ci + seed),
+            }}
+          />
+        ))}
+      </span>
+    ));
+  const ringEl = (inset, po) => (
+    <i
+      className="csdec csring"
+      style={{
+        inset: `${inset}%`,
+        background: `conic-gradient(${Array.from({ length: 6 }, (_, i) => `${col(i + po)} ${i * 60}deg ${(i + 1) * 60}deg`).join(', ')})`,
+      }}
+    />
+  );
+  const edgeStrip = (side) => (
+    <i
+      className={'csdec csedge ' + side}
+      style={{ background: bw ? INK : 'linear-gradient(90deg, #e3a008 0 16.6%, #e8590c 0 33.3%, #d6336c 0 50%, #0ca678 0 66.6%, #1c7ed6 0 83.3%, #7048e8 0 100%)' }}
+    />
+  );
+
+  const deco = minimal ? null : (
+    <>
+      {design === 'skyline' && <>{strip('t', seed + 4)}{strip('b', seed)}</>}
+      {design === 'edges' && <>{edgeStrip('t')}{edgeStrip('b')}{strip('t', seed + 4)}{strip('b', seed)}</>}
+      {(design === 'border' || design === 'borderink') && (
+        <>{strip('t', seed + 4)}{strip('b', seed)}{vstrip('l', seed + 2)}{vstrip('r', seed + 7)}</>
+      )}
+      {(design === 'led' || design === 'ledkit') && ledBorder()}
+      {(design === 'brackets' || design === 'viewfinder') && brackets()}
+      {design === 'rails' && railsEls()}
+      {design === 'eq' && eqEls()}
+      {design === 'ring' && ringEl(16.5, seed)}
+      {design === 'ledkit' && ringEl(22, seed + 2)}
+      {design === 'viewfinder' && ringEl(20, seed + 5)}
+    </>
+  );
+
+  const layout = minimal ? 'pill' : CELL_LAYOUT[design] || 'pill';
+  if (layout === 'ring') {
+    return (
+      <>
+        {deco}
+        <b className="rga">{t.artist}</b>
+        <span className="yr yrpill plain">{t.year || '?'}</span>
+        <i className="rgt">{t.title}</i>
+      </>
+    );
+  }
+  const ink = layout === 'ink' || minimal;
   return (
     <>
-      {!minimal && strip('t', seed + 4)}
-      <span className={'yr yrpill' + (minimal ? ' plain' : '')} style={{ background: minimal ? 'transparent' : pill }}>
+      {deco}
+      <span className={'yr yrpill' + (ink ? ' plain' : '')} style={{ background: ink ? 'transparent' : pill }}>
         {t.year || '?'}
       </span>
       <b>{t.artist}</b>
       <i>{t.title}</i>
-      {!minimal && strip('b', seed)}
     </>
   );
 }
 
-function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist, cardStyle }) {
+function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut, hasPlaylist, cardStyle, designs }) {
   const p = Math.max(0, page);
   const cells = Array.from({ length: grid.perPage }, (_, i) => tracks[p * grid.perPage + i] || null);
   const density = grid.cols >= 5 ? ' tiny' : grid.cols === 4 ? ' dense' : '';
@@ -2053,7 +2254,7 @@ function SheetPreview({ tracks, grid, page, pages, onPage, marginMm, gapMm, cut,
       >
         {cells.map((t, i) => (
           <div key={i} className={'sheet-cell' + (cut && (t || !hasPlaylist) ? ' cut' : '')}>
-            {t && <CellBack t={t} cardStyle={cardStyle} />}
+            {t && <CellBack t={t} cardStyle={cardStyle} design={designFor(t.uri, designs)} />}
           </div>
         ))}
       </div>
