@@ -332,26 +332,66 @@ export default function PlayScreen({ token, onExit }) {
   return (
     <div className={'playroot' + (onCamera ? ' oncam' : '')}>
       {phase === 'pick' && (
-        <div className="play-paper">
-          <div className="play-head">
-            <button className="play-ic ink" title="Close" onClick={onExit}>
-              <Icon d={ICONS.close} size={26} />
-            </button>
-            <span className="grow" />
-          </div>
-          <div className="play-mid">
+        <div className="pm-a">
+          <button className="play-ic ink pm-close" title="Close" onClick={onExit}>
+            <Icon d={ICONS.close} size={26} />
+          </button>
+          <div className="pm-a-mid">
             <h2>How are you playing?</h2>
-            <div className="play-modecards">
-              <button className="play-modecard" onClick={() => setPhase('scan')}>
-                <span className="pmc-t">Physical cards</span>
-                <span className="pmc-s">Scan your printed cards</span>
+            <p className="pm-lede">Two ways to play. Same songs, your table.</p>
+            <div className="pm-cards">
+              {/* Physical: scan a printed QR card */}
+              <button className="pm-card a" onClick={() => setPhase('scan')}>
+                <span className="pm-preview">
+                  <span className="pm-printed" aria-hidden="true">
+                    <span className="pm-sky">
+                      {['--dec60', '--dec70', '--dec80', '--dec90', '--dec00', '--dec10', '--dec70'].map((c, i) => (
+                        <i key={i} style={{ background: `var(${c})`, height: 4 + ((i * 5 + 3) % 8) }} />
+                      ))}
+                    </span>
+                    <span className="pm-qr">
+                      {[1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0].map((v, i) => (
+                        <i key={i} className={v ? 'on' : ''} />
+                      ))}
+                    </span>
+                  </span>
+                  <span className="pm-scan" aria-hidden="true">
+                    <i /><i /><i /><i />
+                  </span>
+                </span>
+                <span className="pm-meta">
+                  <span className="pm-t">Physical cards</span>
+                  <span className="pm-s">Scan your printed QR cards</span>
+                </span>
               </button>
-              <button className="play-modecard" onClick={() => { window.location.hash = '#game'; }}>
-                <span className="pmc-t">Digital game</span>
-                <span className="pmc-s">No cards needed, play on this screen</span>
+
+              {/* Digital: the two-team board, on this screen */}
+              <button className="pm-card b" onClick={() => { window.location.hash = '#game'; }}>
+                <span className="pm-preview">
+                  <span className="pm-board" aria-hidden="true">
+                    <span className="pm-brow top">
+                      {['--dec00', '--dec90', '--dec70'].map((c, i) => (
+                        <i key={i} className="pm-mcard" style={{ '--mc': `var(${c})` }} />
+                      ))}
+                    </span>
+                    <span className="pm-bcenter">
+                      <span className="pm-mystery">?</span>
+                    </span>
+                    <span className="pm-brow bot">
+                      {['--dec80', '--dec60', '--dec10'].map((c, i) => (
+                        <i key={i} className="pm-mcard" style={{ '--mc': `var(${c})` }} />
+                      ))}
+                    </span>
+                  </span>
+                </span>
+                <span className="pm-meta">
+                  <span className="pm-t">Digital game</span>
+                  <span className="pm-s">Play on this screen, no cards</span>
+                </span>
               </button>
             </div>
           </div>
+          <div className="pm-floor" aria-hidden="true" />
         </div>
       )}
 

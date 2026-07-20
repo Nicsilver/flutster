@@ -494,6 +494,80 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .pmc-t { font-size: 16px; font-weight: 800; color: var(--ink); }
 .pmc-s { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
 
+/* /play mode picker — illustrated preview cards */
+.pm-lede { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+.pm-cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; margin-top: 24px; }
+.pm-card {
+  --acc: var(--dec00);
+  width: 304px; padding: 0; overflow: hidden; cursor: pointer; font-family: inherit; text-align: left;
+  border: 3px solid transparent; border-radius: 20px;
+  /* spectrum frame: panel fills the inside, the gradient shows only in the border ring */
+  background: linear-gradient(var(--panel), var(--panel)) padding-box, var(--spectrum) border-box;
+  box-shadow: var(--tile-shadow);
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.pm-card.b { --acc: var(--dec80); }
+.pm-card:hover { transform: translateY(-5px); box-shadow: var(--sheet-shadow); }
+.pm-card:focus-visible { outline: 3px solid var(--acc); outline-offset: 3px; }
+.pm-preview {
+  position: relative; height: 220px; display: grid; place-items: center; overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 5%, var(--panel)); border-bottom: 1px solid var(--line);
+}
+.pm-meta { display: block; padding: 15px 18px 17px; }
+.pm-t { display: block; font-size: 17px; font-weight: 850; color: var(--ink); letter-spacing: -0.01em; }
+.pm-s { display: block; font-size: 13px; color: var(--muted); line-height: 1.45; margin-top: 3px; }
+
+/* physical: a tilted printed card inside a scan viewfinder */
+.pm-printed {
+  width: 104px; height: 138px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line);
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.18); transform: rotate(-5deg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 13px;
+}
+.pm-sky { display: flex; gap: 2.5px; align-items: flex-end; height: 15px; }
+.pm-sky i { width: 4.5px; border-radius: 2px; display: block; }
+.pm-qr { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; width: 62px; }
+.pm-qr i { aspect-ratio: 1; border-radius: 1px; background: transparent; }
+.pm-qr i.on { background: var(--ink); }
+/* scan viewfinder: a centred box framing the tilted card */
+.pm-scan { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 138px; height: 166px; pointer-events: none; }
+.pm-card:hover .pm-scan { width: 130px; height: 158px; transition: width 0.18s, height 0.18s; }
+.pm-scan i { position: absolute; width: 21px; height: 21px; border: 3.5px solid var(--acc); }
+.pm-scan i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 6px 0 0 0; }
+.pm-scan i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 6px 0 0; }
+.pm-scan i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 6px; }
+.pm-scan i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 6px 0; }
+
+/* digital: a mini two-team board */
+.pm-board {
+  width: 158px; height: 146px; border-radius: 13px; overflow: hidden; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 7%, var(--panel)); display: flex; flex-direction: column;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+.pm-board::before, .pm-board::after { content: ''; height: 5px; background: var(--spectrum); flex: none; }
+.pm-brow { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.pm-brow.top { transform: rotate(180deg); }
+.pm-bcenter {
+  flex: none; height: 40px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--ink) 6%, transparent); border-block: 1px solid var(--line);
+}
+.pm-mcard { width: 22px; height: 34px; border-radius: 5px; background: var(--panel); border-bottom: 4px solid var(--mc); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); }
+.pm-mystery { width: 29px; height: 29px; border-radius: 7px; background: var(--panel); border: 1.5px solid var(--ink); display: grid; place-items: center; font-size: 16px; font-weight: 850; color: var(--ink); }
+
+/* layout A: bigger centred cards, anchored by a full-width spectrum floor */
+.pm-a {
+  position: absolute; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 56px 20px 40px; overflow-y: auto;
+}
+.pm-close { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 14px; z-index: 6; }
+.pm-a-mid { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.pm-a-mid h2 { font-size: clamp(30px, 5vw, 40px); font-weight: 850; letter-spacing: -0.02em; margin: 0; }
+.pm-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; background: var(--spectrum); }
+@media (max-width: 620px) {
+  .pm-cards { gap: 14px; }
+  .pm-card { width: min(320px, 86vw); }
+}
+
 /* Digital game */
 .gameroot { position: fixed; inset: 0; z-index: 80; background: var(--bg); overflow-y: auto; display: flex; flex-direction: column; }
 .game-head { display: flex; align-items: center; gap: 8px; padding: max(10px, env(safe-area-inset-top)) 16px 0; flex: none; }
