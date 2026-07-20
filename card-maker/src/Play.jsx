@@ -1,18 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { parseTrackIds, playTrack, resumePlayback, pausePlayback, seekPlayback, fetchDevices, transferPlayback } from './spotify.js';
+import { parseTrackIds, playTrackWithWake, resumePlayback, pausePlayback, seekPlayback } from './spotify.js';
 import { resolveMeta } from './meta.js';
 import { findPreviewUrl } from './previews.js';
 import { loadSources, saveSources, tryParseCard, resolveCard, loadAllSources, invalidateSources, cardCount } from './decksources.js';
+import { createClipPlayer } from './clipplayer.js';
 
 // Blind scan-and-play in the browser, mirroring the phone app's look: full
 // screen camera, then a paper guess screen with no title or artist shown.
-//
-// Preview audio is a two-stage engine. An <audio> element goes first: it is
-// what iPhones need (WebAudio is silenced by the physical mute switch, media
-// elements are not). If the element's pipeline never produces data (some
-// desktop setups refuse the audio/x-m4p clips), the same bytes are fetched
-// and decoded through WebAudio instead, which handles them everywhere.
 const ICONS = {
   play: 'M8 5v14l11-7z',
   pause: 'M6 5h4v14H6zM14 5h4v14h-4z',
@@ -33,8 +28,8 @@ function Icon({ d, size = 24 }) {
 }
 
 export default function PlayScreen({ token, onExit }) {
-  // scan | resolving | tap | playing | miss | nodevice | error
-  const [phase, setPhase] = useState('scan');
+  // pick | scan | resolving | tap | playing | miss | nodevice | error
+  const [phase, setPhase] = useState('pick');
   // Game-night immersion: go fullscreen on touch devices (hides the status
   // bar and browser chrome on Android; iOS Safari has no fullscreen API for
   // pages, so this silently no-ops there). Works when /play is entered via a
@@ -60,8 +55,11 @@ export default function PlayScreen({ token, onExit }) {
   const videoRef = useRef(null);
   const busyRef = useRef(false);
   const uriRef = useRef('');
-  // Hybrid player: { mode: 'el'|'wa', el, ctx, buf, src, startedAt }
-  const playerRef = useRef({ mode: '' });
+  const playerRef = useRef(null);
+  function getPlayer() {
+    if (!playerRef.current) playerRef.current = createClipPlayer();
+    return playerRef.current;
+  }
 
   function pickSource(s) {
     setSource(s);
@@ -78,98 +76,6 @@ export default function PlayScreen({ token, onExit }) {
       gone = true;
     };
   }, [sources]);
-
-  function elResult(a) {
-    return new Promise((resolve) => {
-      let done = false;
-      let graceTimer;
-      const finish = (v) => {
-        if (done) return;
-        done = true;
-        a.removeEventListener('playing', onOk);
-        a.removeEventListener('error', onBad);
-        clearTimeout(graceTimer);
-        resolve(v);
-      };
-      const onOk = () => finish('playing');
-      const onBad = () => finish('fallback');
-      a.addEventListener('playing', onOk);
-      a.addEventListener('error', onBad);
-      // A pipeline that has produced no data after 4s is considered broken
-      // (that is the failure shape, not slow networks: the bytes fetch in
-      // well under a second); one that has data gets more time.
-      graceTimer = setTimeout(() => {
-        if (a.readyState >= 1) graceTimer = setTimeout(() => finish('fallback'), 8000);
-        else finish('fallback');
-      }, 4000);
-      a.play()
-        .then(() => finish('playing'))
-        .catch((e) => finish(e.name === 'NotAllowedError' ? 'tap' : 'fallback'));
-    });
-  }
-
-  async function startPreview(url) {
-    // Stage 1: media element (iPhone-safe; ignores the mute switch).
-    const p = playerRef.current;
-    if (!p.el) {
-      p.el = new Audio();
-      p.el.loop = true;
-    }
-    p.mode = 'el';
-    p.el.src = url;
-    const r1 = await elResult(p.el);
-    if (r1 === 'playing') return 'playing';
-    if (r1 === 'tap') return 'tap';
-    // Stage 2: WebAudio (decodes clips some media pipelines refuse).
-    try {
-      p.el.pause();
-      p.el.removeAttribute('src');
-      const buf = await Promise.race([
-        fetch(url).then((r) => {
-          if (!r.ok) throw new Error('CLIP');
-          return r.arrayBuffer();
-        }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('CLIP')), 15000)),
-      ]);
-      const ctx = p.ctx || new (window.AudioContext || window.webkitAudioContext)();
-      p.ctx = ctx;
-      p.buf = await ctx.decodeAudioData(buf);
-      p.mode = 'wa';
-      waStart(0);
-      if (ctx.state === 'suspended') {
-        await ctx.resume().catch(() => {});
-        if (ctx.state === 'suspended') return 'tap';
-      }
-      return 'playing';
-    } catch {
-      return 'error';
-    }
-  }
-
-  function waStart(offset) {
-    const p = playerRef.current;
-    try {
-      p.src?.stop();
-    } catch {}
-    const src = p.ctx.createBufferSource();
-    src.buffer = p.buf;
-    src.loop = true;
-    src.connect(p.ctx.destination);
-    src.start(0, offset % p.buf.duration);
-    p.src = src;
-    p.startedAt = p.ctx.currentTime - offset;
-  }
-
-  function stopClip() {
-    const p = playerRef.current;
-    p.el?.pause();
-    p.el?.removeAttribute('src');
-    try {
-      p.src?.stop();
-    } catch {}
-    p.src = null;
-    p.ctx?.resume().catch(() => {});
-  }
 
   async function onScan(text) {
     if (busyRef.current) return;
@@ -206,20 +112,7 @@ export default function PlayScreen({ token, onExit }) {
     setPhase('resolving');
     try {
       if (source === 'spotify' && token) {
-        try {
-          await playTrack(uriRef.current, token);
-        } catch (e) {
-          if (e.message !== 'NO_DEVICE') throw e;
-          // Spotify is often open somewhere but idle, which the play endpoint
-          // treats as "no device". Wake the likeliest device and retry once;
-          // only give up when the account truly has no device online.
-          const devices = await fetchDevices(token).catch(() => []);
-          const dev = devices.find((d) => d.is_active) || devices[0];
-          if (!dev) throw e;
-          await transferPlayback(dev.id, token);
-          await new Promise((r) => setTimeout(r, 700));
-          await playTrack(uriRef.current, token);
-        }
+        await playTrackWithWake(uriRef.current, token);
         setPhase('playing');
       } else {
         const meta = known || (await resolveMeta(id));
@@ -230,7 +123,7 @@ export default function PlayScreen({ token, onExit }) {
           busyRef.current = false;
           return;
         }
-        const res = await startPreview(url);
+        const res = await getPlayer().start(url);
         if (res === 'playing') setPhase('playing');
         else if (res === 'tap') setPhase('tap');
         else throw new Error('CLIP');
@@ -328,11 +221,8 @@ export default function PlayScreen({ token, onExit }) {
   useEffect(() => {
     if (phase !== 'playing') return;
     const t = setInterval(() => {
-      const p = playerRef.current;
-      if (source === 'preview' && p.mode === 'el' && p.el) setSec(p.el.currentTime);
-      else if (source === 'preview' && p.mode === 'wa' && p.buf) {
-        setSec(Math.max(0, (p.ctx.currentTime - p.startedAt) % p.buf.duration));
-      } else setSec((s) => (paused ? s : s + 0.5));
+      if (source === 'preview' && playerRef.current) setSec(playerRef.current.position());
+      else setSec((s) => (paused ? s : s + 0.5));
     }, 500);
     return () => clearInterval(t);
   }, [phase, paused, source]);
@@ -347,20 +237,16 @@ export default function PlayScreen({ token, onExit }) {
 
   useEffect(() => {
     return () => {
-      stopClip();
-      playerRef.current.ctx?.close().catch(() => {});
+      playerRef.current?.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function togglePause() {
-    const p = playerRef.current;
     if (source === 'spotify' && token) {
       paused ? resumePlayback(token).catch(() => {}) : pausePlayback(token);
-    } else if (p.mode === 'el') {
-      paused ? p.el.play().catch(() => {}) : p.el.pause();
-    } else if (p.mode === 'wa') {
-      paused ? p.ctx.resume().catch(() => {}) : p.ctx.suspend().catch(() => {});
+    } else {
+      paused ? playerRef.current?.resume() : playerRef.current?.pause();
     }
     setPaused(!paused);
   }
@@ -374,31 +260,24 @@ export default function PlayScreen({ token, onExit }) {
   }
 
   function restart() {
-    const p = playerRef.current;
     if (source === 'spotify' && token) {
       seekPlayback(0, token);
       if (paused) resumePlayback(token).catch(() => {});
-    } else if (p.mode === 'el') {
-      p.el.currentTime = 0;
-      if (paused) p.el.play().catch(() => {});
-    } else if (p.mode === 'wa') {
-      waStart(0);
-      if (paused) p.ctx.resume().catch(() => {});
+    } else {
+      playerRef.current?.restart(paused);
     }
     setSec(0);
     setPaused(false);
   }
 
   function tapPlay() {
-    const p = playerRef.current;
-    if (p.mode === 'el') p.el.play().catch(() => {});
-    else p.ctx?.resume().catch(() => {});
+    playerRef.current?.tapPlay();
     setPhase('playing');
   }
 
   function guess() {
     if (source === 'spotify' && token) pausePlayback(token);
-    stopClip();
+    playerRef.current?.stop();
     setPhase('scan');
   }
 
@@ -452,6 +331,30 @@ export default function PlayScreen({ token, onExit }) {
 
   return (
     <div className={'playroot' + (onCamera ? ' oncam' : '')}>
+      {phase === 'pick' && (
+        <div className="play-paper">
+          <div className="play-head">
+            <button className="play-ic ink" title="Close" onClick={onExit}>
+              <Icon d={ICONS.close} size={26} />
+            </button>
+            <span className="grow" />
+          </div>
+          <div className="play-mid">
+            <h2>How are you playing?</h2>
+            <div className="play-modecards">
+              <button className="play-modecard" onClick={() => setPhase('scan')}>
+                <span className="pmc-t">Physical cards</span>
+                <span className="pmc-s">Scan your printed cards</span>
+              </button>
+              <button className="play-modecard" onClick={() => { window.location.hash = '#game'; }}>
+                <span className="pmc-t">Digital game</span>
+                <span className="pmc-s">No cards needed, play on this screen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {phase === 'scan' && (
         <div className="play-cam">
           {!camErr && <video ref={videoRef} playsInline muted />}
@@ -494,7 +397,7 @@ export default function PlayScreen({ token, onExit }) {
         </div>
       )}
 
-      {phase !== 'scan' && (
+      {phase !== 'scan' && phase !== 'pick' && (
         <div className="play-paper">
           <div className="play-head">
             <button className="play-ic ink" title="Back to scanning" onClick={guess}>

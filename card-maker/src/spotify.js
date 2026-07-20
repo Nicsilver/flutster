@@ -172,6 +172,24 @@ export async function transferPlayback(deviceId, token) {
 }
 
 export const playTrack = (uri, token) => player('/play', token, { uris: [uri] });
+
+// Spotify is often open somewhere but idle, which the play endpoint treats as
+// "no device". Wake the likeliest device and retry once; only give up when
+// the account truly has no device online.
+export async function playTrackWithWake(uri, token) {
+  try {
+    await playTrack(uri, token);
+  } catch (e) {
+    if (e.message !== 'NO_DEVICE') throw e;
+    const devices = await fetchDevices(token).catch(() => []);
+    const dev = devices.find((d) => d.is_active) || devices[0];
+    if (!dev) throw e;
+    await transferPlayback(dev.id, token);
+    await new Promise((r) => setTimeout(r, 700));
+    await playTrack(uri, token);
+  }
+}
+
 export const resumePlayback = (token) => player('/play', token, undefined);
 export const pausePlayback = (token) => player('/pause', token, undefined).catch(() => {});
 export const seekPlayback = (ms, token) => player(`/seek?position_ms=${ms}`, token, undefined).catch(() => {});

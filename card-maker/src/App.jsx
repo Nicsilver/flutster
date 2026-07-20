@@ -6,6 +6,7 @@ import { fetchPastedTracks, deckKey, loadSavedDecks, saveDeck } from './meta.js'
 import { makeFrontsPdf, makeBacksPdf, estimatePerPage } from './pdf.js';
 import { cardColors, rz, DESIGNS, designFor, loadDesigns, saveDesigns } from './cardstyle.js';
 import PlayScreen from './Play.jsx';
+import GameScreen from './Game.jsx';
 
 const A4_W = 210; // mm — page width drives the auto card size
 
@@ -859,6 +860,10 @@ export default function App() {
 
   if (route === '#play') {
     return <PlayScreen token={token} onExit={() => { window.location.hash = ''; }} />;
+  }
+
+  if (route === '#game') {
+    return <GameScreen token={token} theme={theme} onExit={() => { window.location.hash = ''; }} />;
   }
 
   if (!mode) {
