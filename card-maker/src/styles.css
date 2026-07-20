@@ -718,6 +718,9 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .sheet-arrow:hover:not(:disabled) { background: var(--active); }
 .st-a4cap { font-size: 10px; color: var(--muted); text-align: center; margin: 2px 0 6px; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; }
 
+/* No pager between sheet and caption (no deck loaded) — restore breathing room */
+.sheet + .st-a4cap { margin-top: 13px; }
+
 .st-setrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 2px; font-size: 12px; font-weight: 600; color: var(--ink); border-top: 1px solid var(--line); }
 .st-setrow .pair { display: inline-flex; align-items: center; gap: 8px; }
 .st-setrow.dim > span { opacity: 0.45; }
