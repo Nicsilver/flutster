@@ -998,26 +998,68 @@ export default function GameScreen({ token, theme, onExit }) {
   if (screen === 'resume') {
     return (
       <div className="gameroot">
-        <div className="game-head">
-          <span className="grow" />
-          <ThemeToggle theme={theme} />
-          <button className="play-ic ink" title="Close" onClick={onExit}>
-            <Icon d={ICONS.close} size={24} />
+        <div className="pm-a">
+          <button className="play-ic ink pm-close" title="Close" onClick={onExit}>
+            <Icon d={ICONS.close} size={26} />
           </button>
-        </div>
-        <div className="game-mid">
-          <h2>Resume your game?</h2>
-          <p className="play-sub">You left a game in progress.</p>
-          <div className="play-modecards">
-            <button className="play-modecard" onClick={() => setScreen('game')}>
-              <span className="pmc-t">Resume</span>
-              <span className="pmc-s">Pick up where you left off</span>
-            </button>
-            <button className="play-modecard" onClick={newGameFromOver}>
-              <span className="pmc-t">New game</span>
-              <span className="pmc-s">Start fresh</span>
-            </button>
+          <ThemeToggle theme={theme} className="pm-theme" />
+          <div className="pm-a-mid">
+            <h2>Resume your game?</h2>
+            <p className="pm-lede">You left a game in progress.</p>
+            <div className="pm-cards">
+              {/* Resume: the board you left, mid-play */}
+              <button className="pm-card a" onClick={() => setScreen('game')}>
+                <span className="pm-preview">
+                  <span className="pm-resumewrap">
+                    <span className="pm-board" aria-hidden="true">
+                      <span className="pm-brow top">
+                        {['--dec00', '--dec90', '--dec70'].map((c, i) => (
+                          <i key={i} className="pm-mcard" style={{ '--mc': `var(${c})` }} />
+                        ))}
+                      </span>
+                      <span className="pm-bcenter">
+                        <span className="pm-mystery">?</span>
+                      </span>
+                      <span className="pm-brow bot">
+                        {['--dec80', '--dec60', '--dec10'].map((c, i) => (
+                          <i key={i} className="pm-mcard" style={{ '--mc': `var(${c})` }} />
+                        ))}
+                      </span>
+                    </span>
+                    <span className="pm-playbadge" aria-hidden="true">
+                      <Icon d={ICONS.play} size={16} />
+                    </span>
+                  </span>
+                </span>
+                <span className="pm-meta">
+                  <span className="pm-t">Resume</span>
+                  <span className="pm-s">Pick up where you left off</span>
+                </span>
+              </button>
+
+              {/* New game: fresh two-team setup */}
+              <button className="pm-card b" onClick={newGameFromOver}>
+                <span className="pm-preview">
+                  <span className="pm-setupmini" aria-hidden="true">
+                    <span className="sh a">
+                      <span className="dot" />
+                      <span className="line" />
+                    </span>
+                    <span className="seam" />
+                    <span className="sh b">
+                      <span className="dot" />
+                      <span className="line" />
+                    </span>
+                  </span>
+                </span>
+                <span className="pm-meta">
+                  <span className="pm-t">New game</span>
+                  <span className="pm-s">Start fresh</span>
+                </span>
+              </button>
+            </div>
           </div>
+          <div className="pm-floor" aria-hidden="true" />
         </div>
       </div>
     );
