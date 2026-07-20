@@ -1323,14 +1323,27 @@ export default function App() {
           </div>
           <div className="st-setrow">
             <span>Card style</span>
-            <select
-              className="st-flip"
-              value={cardStyle}
-              onChange={(e) => { setCardStyle(e.target.value); localStorage.setItem('flutster_cardstyle', e.target.value); }}
-            >
-              <option value="color">Colour</option>
-              <option value="bw">B&W · ink saver</option>
-            </select>
+            <div className="st-seg" role="group" aria-label="Card style">
+              <button
+                type="button"
+                className={'st-seg-opt' + (cardStyle === 'color' ? ' on' : '')}
+                aria-pressed={cardStyle === 'color'}
+                onClick={() => { setCardStyle('color'); localStorage.setItem('flutster_cardstyle', 'color'); }}
+              >
+                <span className="st-sw rainbow" />
+                Colour
+              </button>
+              <button
+                type="button"
+                className={'st-seg-opt' + (cardStyle === 'bw' ? ' on' : '')}
+                aria-pressed={cardStyle === 'bw'}
+                onClick={() => { setCardStyle('bw'); localStorage.setItem('flutster_cardstyle', 'bw'); }}
+                title="Simple, least-ink design"
+              >
+                <span className="st-sw mono" />
+                B&amp;W
+              </button>
+            </div>
           </div>
           <div className={'st-setrow' + (cardStyle === 'bw' ? ' dim' : '')}>
             <span>Card design</span>
