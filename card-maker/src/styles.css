@@ -686,6 +686,10 @@ footer { margin-top: 44px; color: var(--muted); font-size: 12.5px; border-top: 1
 .gb-token {
   width: 34px; height: 34px; border-radius: 50%; background: var(--panel); flex: none; overflow: hidden;
   display: grid; place-items: center; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  /* pointer-drag pieces need touch-action:none on themselves — an ancestor's
+     value doesn't reliably suppress the browser's pan gesture, which otherwise
+     pointercancels the drag the moment a finger crosses a scrollable timeline */
+  touch-action: none; user-select: none;
 }
 .gb-token.grab { cursor: grab; }
 .gb-tokimg { width: 100%; height: 100%; display: block; pointer-events: none; }
@@ -726,6 +730,7 @@ body.gb-dragging .gb-slot.live.near {
   transform: rotate(-2.5deg); cursor: pointer; flex: none;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  touch-action: none; user-select: none;
 }
 .gb-facedown.locked { border-style: solid; border-color: var(--dec80); }
 .gb-facedown .gb-q { font-size: 34px; font-weight: 800; line-height: 1; }
@@ -774,7 +779,7 @@ body.gb-dragging .gb-slot.live.near {
 
 /* draw pile */
 .gb-pilewrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.gb-pile { position: relative; width: 92px; height: 108px; }
+.gb-pile { position: relative; width: 92px; height: 108px; touch-action: none; user-select: none; }
 .gb-pile .gb-pcard {
   position: absolute; inset: 0; border-radius: 12px; background: var(--bg); border: 1.5px solid var(--ink);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);

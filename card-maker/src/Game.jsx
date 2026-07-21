@@ -312,7 +312,6 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
   const [audioPhase, setAudioPhase] = useState('loading'); // loading | tap | playing | miss | nodevice | error
   const [paused, setPaused] = useState(false);
   const [sec, setSec] = useState(0);
-  const [tentSlot, setTentSlot] = useState(null); // gap the face-down card sits in before locking
   const [pendingBuy, setPendingBuy] = useState(0); // 0-2 tokens dropped on the pile toward a buy
   const [revealStage, setRevealStage] = useState(0); // 0/1 = flip in place, 2 = bonus + draw window
   const prevTeamsRef = useRef(null); // teams snapshot captured just before a resolving dispatch
@@ -341,7 +340,6 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
   });
 
   useEffect(() => {
-    setTentSlot(null);
     setPendingBuy(0);
   }, [state.phase, state.current?.uri]);
 
@@ -504,43 +502,19 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
     }));
   const activeTokenTargets = () => {
     const arr = [];
-    if (mysteryRef.current && tentSlot == null) arr.push({ el: mysteryRef.current, act: 'skip' });
+    if (mysteryRef.current) arr.push({ el: mysteryRef.current, act: 'skip' });
     if (pileRef.current && state.pile.length > 0) arr.push({ el: pileRef.current, act: 'buy' });
     return arr;
   };
 
-  function lockIn() {
-    if (tentSlot == null) return;
-    prevTeamsRef.current = state.teams;
-    dispatch({ type: 'place', slot: tentSlot });
-  }
+  // Dropping the mystery card into a gap commits the placement outright (no
+  // separate Lock tap): the reducer opens the steal window when the other team
+  // still has a token, otherwise it resolves straight to the reveal.
   function onMysteryDown(e) {
-    startDrag(e, e.currentTarget, { targets: activeLiveSlots, expandSlots: true }, (hit) => setTentSlot(hit.slot));
-  }
-  // Face-down card during 'turn': 8px probe splits a tap (lock in) from a
-  // re-drag (move to a different gap).
-  function onFacedownDown(e) {
-    const srcEl = e.currentTarget;
-    const sx = e.clientX;
-    const sy = e.clientY;
-    let moved = false;
-    const cleanup = () => {
-      window.removeEventListener('pointermove', probe);
-      window.removeEventListener('pointerup', done);
-    };
-    const probe = (ev) => {
-      if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) {
-        moved = true;
-        cleanup();
-        startDrag(ev, srcEl, { targets: activeLiveSlots, expandSlots: true }, (hit) => setTentSlot(hit.slot));
-      }
-    };
-    const done = () => {
-      cleanup();
-      if (!moved) lockIn();
-    };
-    window.addEventListener('pointermove', probe);
-    window.addEventListener('pointerup', done);
+    startDrag(e, e.currentTarget, { targets: activeLiveSlots, expandSlots: true }, (hit) => {
+      prevTeamsRef.current = state.teams;
+      dispatch({ type: 'place', slot: hit.slot });
+    });
   }
   function onStealPass() {
     prevTeamsRef.current = state.teams;
@@ -634,11 +608,6 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
     const nm = (i) => state.teams[i].name;
     if (state.phase === 'turn') {
       if (active && audioPhase === 'miss') return { text: 'No preview, drawing another…', hot: true };
-      if (tentSlot != null) {
-        return active
-          ? { text: 'Happy? Tap the card to lock it in. Or drag it somewhere else.', hot: true }
-          : { text: `Waiting for ${nm(state.turn)}…`, hot: false };
-      }
       return active
         ? {
             text: 'Listen, then drag the mystery card into your timeline. Tokens: 1 skips the song, 3 on the pile buys a card.',
@@ -652,7 +621,7 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
             text: 'Music paused. Think that spot is wrong? Drag one of your tokens into the gap where the card really belongs. Or tap the card to let it flip.',
             hot: true,
           }
-        : { text: `Locked. ${nm(other)} decides whether to steal.`, hot: false };
+        : { text: `Placed. ${nm(other)} decides whether to steal.`, hot: false };
     }
     if (state.phase === 'reveal') {
       if (revealStage < 2) return { text: outcomeMsg(), hot: true };
@@ -675,22 +644,18 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
     const n = cards.length;
     const isActive = team === state.turn;
     const showLive = isActive && (state.phase === 'turn' || state.phase === 'steal');
-    const facedownSlot = state.phase === 'steal' ? state.placedSlot : tentSlot;
+    const facedownSlot = state.phase === 'steal' ? state.placedSlot : null;
     const revealAt = state.stealSlot != null ? state.stealSlot : state.placedSlot;
     const lost = state.outcome && !state.outcome.placedOk && !state.outcome.stole;
     const items = [];
     for (let slot = 0; slot <= n; slot++) {
       if (showLive && facedownSlot != null && slot === facedownSlot) {
-        const locked = state.phase === 'steal';
+        // Only the 'steal' phase reaches here: the committed card sits face-down
+        // in its gap until the steal decision flips it.
         items.push(
-          <div
-            key={`gap${slot}`}
-            className={'gb-facedown' + (locked ? ' locked' : '')}
-            onPointerDown={locked ? undefined : onFacedownDown}
-            onClick={locked ? onStealPass : undefined}
-          >
+          <div key={`gap${slot}`} className="gb-facedown locked" onClick={onStealPass}>
             <span className="gb-q">?</span>
-            <span className="gb-hint">{locked ? 'tap to flip' : 'tap to lock'}</span>
+            <span className="gb-hint">tap to flip</span>
           </div>
         );
       } else if (showLive) {
@@ -719,7 +684,7 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
     const shownTokens = t.tokens - (team === state.turn ? pendingBuy : 0);
     const canGrab =
       shownTokens > 0 &&
-      ((state.phase === 'turn' && team === state.turn && tentSlot == null) ||
+      ((state.phase === 'turn' && team === state.turn) ||
         (state.phase === 'steal' && team === 1 - state.turn));
     // The only steal cue: flash the challenger's token pile (no dimming anywhere).
     const flashTokens = state.phase === 'steal' && team === 1 - state.turn && shownTokens > 0;
@@ -749,7 +714,7 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
   function renderCenter() {
     const drawGlow = state.phase === 'reveal' && revealStage >= 2;
     const bonusOpen = drawGlow && !state.outcome.bonusJudged;
-    const mysteryAway = tentSlot != null || state.phase !== 'turn' || !state.current;
+    const mysteryAway = state.phase !== 'turn' || !state.current;
     const pulse = audioPhase === 'playing' && !paused && !mysteryAway;
     // Mirrored transport: one cluster faces each team so both can reach it.
     const audioBlock = (flip) => (
@@ -841,11 +806,11 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
             ref={mysteryRef}
             className={
               'gb-mystery' +
-              (!mysteryAway && state.phase === 'turn' && tentSlot == null ? ' grab' : '') +
+              (!mysteryAway && state.phase === 'turn' ? ' grab' : '') +
               (mysteryAway ? ' away' : '') +
               (pulse ? ' pulse' : '')
             }
-            onPointerDown={state.phase === 'turn' && state.current && tentSlot == null ? onMysteryDown : undefined}
+            onPointerDown={state.phase === 'turn' && state.current ? onMysteryDown : undefined}
           >
             <Skyline n={11} />
             <span className="gb-q">?</span>
