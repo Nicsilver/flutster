@@ -831,6 +831,16 @@ body.gb-dragging .gb-slot.live.near {
 .gb-clone.flipped { transform: translate(-50%, -50%) rotate(180deg); }
 .gb-exit { position: fixed; right: 10px; bottom: 10px; z-index: 90; }
 .gb-theme { position: fixed; right: 52px; bottom: 10px; z-index: 90; }
+/* in-game Previews/Spotify toggle — theme-matched (the scanner's sits on a dark
+   camera feed; this rides the paper/ink board) */
+.gb-src {
+  position: fixed; left: 10px; bottom: 10px; z-index: 90;
+  display: flex; border-radius: 999px; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.gb-src .src-pill { color: var(--muted); }
+.gb-src .src-pill.on { background: var(--ink); color: var(--bg); }
+.gb-src .src-pill:disabled { opacity: 0.4; cursor: default; }
 .gset-headbtns { display: flex; align-items: center; gap: 2px; }
 
 @media (prefers-reduced-motion: no-preference) {

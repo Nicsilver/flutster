@@ -300,7 +300,7 @@ function SetupScreen({
   );
 }
 
-function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGame }) {
+function GamePlay({ initial, token, source, onSetSource, theme, onExit, onPlayAgain, onNewGame }) {
   const [state, dispatch] = useReducer(gameReducer, initial);
   const mark = markSrc(theme?.isDark);
   const playerRef = useRef(null);
@@ -428,6 +428,7 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
     setAudioPhase('loading');
     (async () => {
       if (source === 'spotify' && token) {
+        playerRef.current?.stop(); // kill any preview clip when switching to Spotify
         try {
           await playTrackWithWake(uri, token);
           if (!cancelled) setAudioPhase('playing');
@@ -436,6 +437,7 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
           setAudioPhase(e.message === 'NO_DEVICE' ? 'nodevice' : 'error');
         }
       } else {
+        if (token) pausePlayback(token); // silence Spotify when switching to previews
         const t = state.current;
         const url = await findPreviewUrl({ uri: t.uri, title: t.title, artist: t.artist });
         if (cancelled) return;
@@ -453,8 +455,10 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
     return () => {
       cancelled = true;
     };
+    // Re-fires on a source flip too, so toggling Previews/Spotify mid-round
+    // switches engines on the current mystery card (and unlocks seek).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.current?.uri, state.phase === 'turn']);
+  }, [state.current?.uri, state.phase === 'turn', source]);
 
   // No preview anywhere: skip it for free and move straight to the next card.
   useEffect(() => {
@@ -621,30 +625,53 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
       }
     );
   }
+  function drawNext() {
+    // next may end the game; draw then no-ops on phase 'over'
+    dispatch({ type: 'next' });
+    dispatch({ type: 'draw' });
+  }
+  // Draw pile: an 8px probe splits a tap (draw straight away — faster) from a
+  // drag (pull the card into the middle, the deliberate gesture). Either way it
+  // becomes the next mystery.
   function onPileDown(e) {
     // Clone the whole pile, not the inner top card — the card's frame comes
     // from the descendant selector `.gb-pile .gb-pcard`, which stops matching
     // once the clone is detached to <body>.
-    startDrag(
-      e,
-      pileRef.current || e.currentTarget,
-      {
-        // Draw = pull the card into the MIDDLE, where it becomes the next
-        // mystery. The mid cell is a big, obvious target between both teams.
-        targets: () => {
-          const arr = [];
-          const mid = document.querySelector('.gb-cell.mid');
-          if (mid) arr.push({ el: mid, act: 'draw' });
-          if (mysteryRef.current) arr.push({ el: mysteryRef.current, act: 'draw' });
-          return arr;
-        },
-      },
-      () => {
-        // next may end the game; draw then no-ops on phase 'over'
-        dispatch({ type: 'next' });
-        dispatch({ type: 'draw' });
+    const srcEl = pileRef.current || e.currentTarget;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let moved = false;
+    const cleanup = () => {
+      window.removeEventListener('pointermove', probe);
+      window.removeEventListener('pointerup', done);
+    };
+    const probe = (ev) => {
+      if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) {
+        moved = true;
+        cleanup();
+        startDrag(
+          ev,
+          srcEl,
+          {
+            // The mid cell is a big, obvious drop target between both teams.
+            targets: () => {
+              const arr = [];
+              const mid = document.querySelector('.gb-cell.mid');
+              if (mid) arr.push({ el: mid, act: 'draw' });
+              if (mysteryRef.current) arr.push({ el: mysteryRef.current, act: 'draw' });
+              return arr;
+            },
+          },
+          drawNext
+        );
       }
-    );
+    };
+    const done = () => {
+      cleanup();
+      if (!moved) drawNext();
+    };
+    window.addEventListener('pointermove', probe);
+    window.addEventListener('pointerup', done);
   }
 
   function outcomeMsg() {
@@ -684,8 +711,8 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
       if (team === other) {
         return {
           text: state.outcome.bonusJudged
-            ? 'Drag the top of the draw pile into the middle to start your turn.'
-            : 'Did anyone name song + artist? Drag them a token from the supply. Then drag the top of the draw pile into the middle to start your turn.',
+            ? 'Tap the draw pile (or drag it to the middle) to start your turn.'
+            : 'Did anyone name song + artist? Drag them a token from the supply. Then tap the draw pile to start your turn.',
           hot: true,
         };
       }
@@ -928,6 +955,19 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
       {renderZone(1, true)}
       {renderCenter()}
       {renderZone(0, false)}
+      <div className="gb-src">
+        <button className={'src-pill' + (source === 'preview' ? ' on' : '')} onClick={() => onSetSource?.('preview')}>
+          Previews
+        </button>
+        <button
+          className={'src-pill' + (source === 'spotify' ? ' on' : '')}
+          disabled={!token}
+          title={token ? 'Full songs on your active Spotify device' : 'Log in on the card maker first'}
+          onClick={() => onSetSource?.('spotify')}
+        >
+          Spotify
+        </button>
+      </div>
       <ThemeToggle theme={theme} className="gb-theme" />
       <button className="play-ic ink gb-exit" title="Exit" onClick={doExit}>
         <Icon d={ICONS.close} size={24} />
@@ -961,6 +1001,15 @@ export default function GameScreen({ token, theme, onExit }) {
   const [source, setSource] = useState(() =>
     token && localStorage.getItem('flutster_playsrc') === 'spotify' ? 'spotify' : 'preview'
   );
+  // Persisted so the in-game toggle and the setup picker agree, and the choice
+  // carries to the next game (mirrors the scanner's flutster_playsrc).
+  function pickSource(s) {
+    if (s === 'spotify' && !token) return;
+    setSource(s);
+    try {
+      localStorage.setItem('flutster_playsrc', s);
+    } catch {}
+  }
   const [err, setErr] = useState('');
 
   async function pickDeck(ref) {
@@ -1104,7 +1153,7 @@ export default function GameScreen({ token, theme, onExit }) {
         target={target}
         setTarget={setTarget}
         source={source}
-        setSource={setSource}
+        setSource={pickSource}
         token={token}
         canStart={!!deckTracks && deckTracks.length >= 2}
         onStart={start}
@@ -1118,6 +1167,7 @@ export default function GameScreen({ token, theme, onExit }) {
       initial={initial}
       token={token}
       source={source}
+      onSetSource={pickSource}
       theme={theme}
       onExit={onExit}
       onPlayAgain={playAgain}
