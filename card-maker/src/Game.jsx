@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { gameReducer, newGame, decVar } from './game.js';
 import { listGameDecks, loadGameDeck } from './deckload.js';
 import { createClipPlayer } from './clipplayer.js';
@@ -317,6 +317,7 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
   const prevTeamsRef = useRef(null); // teams snapshot captured just before a resolving dispatch
   const mysteryRef = useRef(null);
   const pileRef = useRef(null);
+  const flightRef = useRef(null); // {fromRect, fromFlip} of the flipped card, captured before stage 2
 
   // Persist on every change while the game is live; a finished game is
   // dropped from storage so a reload never offers to "resume" it.
@@ -346,20 +347,75 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
   // Reveal plays in two beats: stage 1 flips the card in place (rendered from
   // the pre-resolve rows in prevTeamsRef, since the reducer already inserted
   // it), stage 2 settles into the real rows and opens the bonus/draw window.
+  // Between the beats a clone flies the card from where it flipped to its final
+  // sorted slot — across the table (with a 180° tumble) when it's stolen (see
+  // the flight layout effect below).
   useEffect(() => {
     if (state.phase !== 'reveal') {
       setRevealStage(0);
       return;
     }
+    flightRef.current = null;
     setRevealStage(1);
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setRevealStage(2);
       return;
     }
-    const t = setTimeout(() => setRevealStage(2), 1400);
+    const t = setTimeout(() => {
+      // Snapshot the flipped card's spot BEFORE stage 2 reflows it away.
+      const flipEl = document.querySelector('.gb-tlrow .gb-flipin');
+      flightRef.current = flipEl
+        ? { fromRect: flipEl.getBoundingClientRect(), fromFlip: flipEl.closest('.gb-zone.flip') ? 180 : 0 }
+        : null;
+      setRevealStage(2);
+    }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase, state.current?.uri]);
+
+  // The flight: at stage 2 the card's final resting slot exists (marked
+  // .gb-flydest). Clone it, park the clone over the destination, and animate it
+  // in from where it flipped — a viewport-space transform so a rotated (flipped)
+  // team zone just becomes part of the tumble instead of breaking the math.
+  useLayoutEffect(() => {
+    if (revealStage < 2) return;
+    const f = flightRef.current;
+    flightRef.current = null;
+    if (!f) return;
+    const dest = document.querySelector('.gb-flydest');
+    if (!dest) return;
+    const to = dest.getBoundingClientRect();
+    const dx = f.fromRect.left + f.fromRect.width / 2 - (to.left + to.width / 2);
+    const dy = f.fromRect.top + f.fromRect.height / 2 - (to.top + to.height / 2);
+    const toFlip = dest.closest('.gb-zone.flip') ? 180 : 0;
+    // A card that lands where it flipped (correct placement, no steal) needs no
+    // flight — let its settle pop play instead.
+    if (Math.hypot(dx, dy) < 6 && f.fromFlip === toFlip) return;
+    const clone = dest.cloneNode(true);
+    clone.classList.remove('gb-settle', 'gb-flydest');
+    clone.classList.add('gb-flyclone');
+    Object.assign(clone.style, {
+      position: 'fixed', left: `${to.left}px`, top: `${to.top}px`,
+      width: `${to.width}px`, height: `${to.height}px`, margin: '0', zIndex: '150', transformOrigin: 'center',
+    });
+    document.body.appendChild(clone);
+    dest.style.visibility = 'hidden';
+    const anim = clone.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) rotate(${f.fromFlip}deg) scale(1)`, offset: 0 },
+        { transform: `translate(0px, 0px) rotate(${toFlip}deg) scale(1.06)`, offset: 0.85 },
+        { transform: `translate(0px, 0px) rotate(${toFlip}deg) scale(1)`, offset: 1 },
+      ],
+      { duration: 560, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'both' }
+    );
+    const done = () => {
+      clone.remove();
+      if (dest.isConnected) dest.style.visibility = '';
+    };
+    anim.onfinish = done;
+    anim.oncancel = done;
+    return () => anim.cancel();
+  }, [revealStage]);
 
   // Blind playback: fires once per fresh mystery card, while the round is
   // still being guessed. Steal reuses whatever is already playing.
@@ -672,7 +728,7 @@ function GamePlay({ initial, token, source, theme, onExit, onPlayAgain, onNewGam
           revealStage >= 2 &&
           c.uri === state.current?.uri &&
           ((state.outcome.placedOk && team === state.turn) || (state.outcome.stole && team === 1 - state.turn));
-        items.push(<BoardCard key={`c${slot}${c.uri}`} c={c} className={settle ? 'gb-settle' : ''} />);
+        items.push(<BoardCard key={`c${slot}${c.uri}`} c={c} className={settle ? 'gb-settle gb-flydest' : ''} />);
       }
     }
     return items;

@@ -857,9 +857,11 @@ body.gb-dragging .gb-slot.live.near {
   100% { opacity: 0; transform: scale(0.7) rotate(10deg) translateY(20px); }
 }
 @keyframes gb-settle {
-  from { transform: scale(1.25); }
+  from { transform: scale(1.14); }
   to { transform: scale(1); }
 }
+/* the card in flight from where it flipped to its final timeline slot */
+.gb-flyclone { pointer-events: none; filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.32)); }
 @keyframes gb-eq { from { transform: scaleY(0.45); } to { transform: scaleY(1); } }
 @keyframes gb-glow {
   0%, 100% { box-shadow: none; }
