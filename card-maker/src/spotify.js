@@ -188,7 +188,15 @@ export async function playTrackWithWake(uri, token) {
     await new Promise((r) => setTimeout(r, 700));
     await playTrack(uri, token);
   }
+  // Loop the track so a finished song doesn't autoplay Spotify's
+  // recommendations; setRepeat(false) on exit undoes this global setting.
+  await setRepeat(true, token);
 }
+
+// Repeat is a global player setting — reset to off when leaving playback so
+// the user's Spotify isn't left stuck looping one track.
+export const setRepeat = (on, token) =>
+  player(`/repeat?state=${on ? 'track' : 'off'}`, token, undefined).catch(() => {});
 
 export const resumePlayback = (token) => player('/play', token, undefined);
 export const pausePlayback = (token) => player('/pause', token, undefined).catch(() => {});

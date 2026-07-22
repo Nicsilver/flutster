@@ -62,6 +62,13 @@ class SpotifyService {
         }
       });
 
+  // Loop the current track so a finished song doesn't autoplay Spotify's
+  // recommendations. Reset to off on exit — it's a global player setting that
+  // would otherwise stick on the user's account.
+  Future<void> setRepeat(bool on) => _run(() => SpotifySdk.setRepeatMode(
+        repeatMode: on ? RepeatMode.track : RepeatMode.off,
+      ));
+
   Future<void> pause() => _run(() => SpotifySdk.pause());
   Future<void> resume() => _run(() => SpotifySdk.resume());
   Future<void> seekTo(int ms) =>

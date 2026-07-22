@@ -511,6 +511,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     _baseMs = startAt;
     _syncAt = DateTime.now();
     _spotify.play(widget.track.spotifyUri, startAtMs: startAt);
+    _spotify.setRepeat(true);
     _spotify.isInLikedPlaylist(widget.track.spotifyUri).then((already) {
       if (mounted && already) setState(() => _saved = true);
     });
@@ -600,7 +601,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     return PopScope(
       // Stop playback on any exit (GUESS, close, back button/gesture).
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) _spotify.pause();
+        if (didPop) {
+          _spotify.setRepeat(false);
+          _spotify.pause();
+        }
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { gameReducer, newGame, decVar } from './game.js';
 import { listGameDecks, loadGameDeck } from './deckload.js';
 import { createClipPlayer } from './clipplayer.js';
-import { playTrackWithWake, pausePlayback, resumePlayback, seekPlayback } from './spotify.js';
+import { playTrackWithWake, pausePlayback, resumePlayback, seekPlayback, setRepeat } from './spotify.js';
 import { findPreviewUrl } from './previews.js';
 
 const STORAGE_KEY = 'flutster_game';
@@ -483,14 +483,20 @@ function GamePlay({ initial, token, source, onSetSource, theme, onExit, onPlayAg
   useEffect(() => {
     if (state.phase !== 'reveal' && state.phase !== 'over') return;
     playerRef.current?.stop();
-    if (source === 'spotify' && token) pausePlayback(token);
+    if (source === 'spotify' && token) {
+      setRepeat(false, token);
+      pausePlayback(token);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase]);
 
   useEffect(() => {
     return () => {
       playerRef.current?.dispose();
-      if (source === 'spotify' && token) pausePlayback(token);
+      if (source === 'spotify' && token) {
+        setRepeat(false, token);
+        pausePlayback(token);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -549,7 +555,10 @@ function GamePlay({ initial, token, source, onSetSource, theme, onExit, onPlayAg
   }
   function doExit() {
     playerRef.current?.dispose();
-    if (source === 'spotify' && token) pausePlayback(token);
+    if (source === 'spotify' && token) {
+      setRepeat(false, token);
+      pausePlayback(token);
+    }
     onExit();
   }
 

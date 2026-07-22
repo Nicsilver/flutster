@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { parseTrackIds, playTrackWithWake, resumePlayback, pausePlayback, seekPlayback } from './spotify.js';
+import { parseTrackIds, playTrackWithWake, resumePlayback, pausePlayback, seekPlayback, setRepeat } from './spotify.js';
 import { resolveMeta } from './meta.js';
 import { findPreviewUrl } from './previews.js';
 import { loadSources, saveSources, tryParseCard, resolveCard, loadAllSources, invalidateSources, cardCount } from './decksources.js';
@@ -276,7 +276,10 @@ export default function PlayScreen({ token, onExit }) {
   }
 
   function guess() {
-    if (source === 'spotify' && token) pausePlayback(token);
+    if (source === 'spotify' && token) {
+      setRepeat(false, token);
+      pausePlayback(token);
+    }
     playerRef.current?.stop();
     setPhase('scan');
   }
