@@ -21,10 +21,6 @@ approved backs, several checked = even hashed split across the deck.)
   - re-upload the GitHub social preview banner (manual: repo Settings →
     Social preview → `screenshots/social-banner.png`);
   - launch posts. Deliberately held until the app is live.
-- **Spotify developer-app signups reopening.** A scheduled check runs every
-  few days and opens a GitHub issue if the freeze lifts. When it fires,
-  soften the "currently locked" warnings in the app onboarding, the web mode
-  chooser, and the README.
 
 ## Parked decisions
 

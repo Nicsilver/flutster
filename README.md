@@ -32,7 +32,7 @@ The card maker and both players work in one of two modes, chosen on first visit 
 | Playback | Full songs through Spotify | 30-second iTunes preview clips; cards without one are tagged before you print |
 | Printed cards | Identical in both modes | Identical in both modes |
 
-Preview mode exists because Spotify has paused new developer app signups: without a developer app you cannot use Spotify mode, but you can still build, verify, print, and play a full deck with zero accounts. The metadata mirror is a tiny [Cloudflare Worker](card-maker/worker/meta-worker.js) that only reads public Spotify pages and holds no credentials of any kind.
+Preview mode is for anyone without Spotify Premium or a developer app: you can still build, verify, print, and play a full deck with zero accounts. The metadata mirror is a tiny [Cloudflare Worker](card-maker/worker/meta-worker.js) that only reads public Spotify pages and holds no credentials of any kind.
 
 ## Screenshots
 
@@ -112,7 +112,7 @@ If a card's QR encodes a card number instead of a song link (official Hitster-st
 
 ## Spotify mode setup
 
-Full-song playback runs on a free Spotify developer app that you create yourself, so you never share credentials or hit someone else's limits. Note that Spotify has currently paused new developer app signups; if you cannot create one, use Preview mode. If you already have one:
+Full-song playback runs on a free Spotify developer app that you create yourself, so you never share credentials or hit someone else's limits. Spotify allows up to 5 users per developer app, and the account that owns it needs Premium. To set one up:
 
 1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and press **Create app**.
 2. Under **Redirect URIs**, add both:
