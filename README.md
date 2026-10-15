@@ -74,7 +74,7 @@ Preview mode is for anyone without Spotify Premium or a developer app: you can s
 ### Print
 
 - Fronts are vector QR codes, pixel-identical on every card so nobody can memorize them. Backs carry the artist, a big year, and the title, each card colored by a hash of the track so nothing on the card hints at the year.
-- Three ink levels: Colour, B&W ink saver, and Minimal.
+- Two ink levels: Colour, and a B&W ink saver that prints plain black text with no decorations.
 - Optional deck label printed along both side edges of each front, so mixed decks sort apart in seconds.
 - Live A4 sheet preview, cut guides, and mirrored backs for hand-duplex printing: print the fronts, flip the stack, print the backs.
 - Print tracking remembers what you already printed, shows what is new or changed since, filters the PDFs down to just those cards, and flags printed cards whose year was corrected afterwards.
